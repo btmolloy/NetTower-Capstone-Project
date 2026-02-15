@@ -197,16 +197,3 @@
         <p data-start="4239" data-end="4286">Performance testing under varying device counts</p>
     </li>
 </ul>
-<p data-start="4288" data-end="4390">&nbsp;</p>
-<hr data-start="4392" data-end="4395" />
-<h1 data-start="4397" data-end="4419"><strong data-start="4399" data-end="4419">Learning with AI</strong></h1>
-<h3 data-start="4421" data-end="4440">Topics to Learn</h3>
-<ul data-start="4441" data-end="4586">
-    <li data-start="4441" data-end="4521">
-        <p data-start="4443" data-end="4521">Layer 2, Layer 3, and Layer 4 protocol behavior, limitations, and capabilities</p>
-    </li>
-    <li data-start="4522" data-end="4586">
-        <p data-start="4524" data-end="4586">Traffic packet structure and protocol breakdown at a low level</p>
-    </li>
-</ul>
-
