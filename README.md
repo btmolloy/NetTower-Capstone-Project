@@ -1,4 +1,4 @@
-<h2 data-start="234" data-end="247"><span style="font-size: 36pt;">NetTower - Capstone</span></h2>
+<h1 data-start="234" data-end="247"><span style="font-size: 36pt;">NetTower - Capstone</span></h1>
 <h1 data-start="340" data-end="359"><strong data-start="342" data-end="359">Project Links</strong></h1>
 <ul data-start="361" data-end="500">
     <li data-start="361" data-end="405">
