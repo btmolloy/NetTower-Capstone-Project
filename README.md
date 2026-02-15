@@ -1,4 +1,3 @@
-Repo for Capstone Project
 <h2 data-start="234" data-end="247"><span style="font-size: 36pt;">NetTower - Capstone</span></h2>
 <h1 data-start="340" data-end="359"><strong data-start="342" data-end="359">Project Links</strong></h1>
 <ul data-start="361" data-end="500">
@@ -210,44 +209,4 @@ Repo for Capstone Project
         <p data-start="4524" data-end="4586">Traffic packet structure and protocol breakdown at a low level</p>
     </li>
 </ul>
-<h3 data-start="4588" data-end="4606">How AI Is Used</h3>
-<ul data-start="4607" data-end="4822">
-    <li data-start="4607" data-end="4654">
-        <p data-start="4609" data-end="4654">Breaking down protocol mechanics step-by-step</p>
-    </li>
-    <li data-start="4655" data-end="4698">
-        <p data-start="4657" data-end="4698">Exploring inference limits and edge cases</p>
-    </li>
-    <li data-start="4699" data-end="4760">
-        <p data-start="4701" data-end="4760">Supporting design decisions for discovery and visualization</p>
-    </li>
-    <li data-start="4761" data-end="4822">
-        <p data-start="4763" data-end="4822">Validating reasoning about constrained network environments</p>
-    </li>
-</ul>
-<p data-start="4824" data-end="4914">The AI component supports technical learning rather than adding AI-based product features.</p>
-<hr data-start="4916" data-end="4919" />
-<h1 data-start="4921" data-end="4945"><strong data-start="4923" data-end="4945">Challenges / Risks</strong></h1>
-<ul data-start="4947" data-end="5226">
-    <li data-start="4947" data-end="4986">
-        <p data-start="4949" data-end="4986">Incomplete or misleading network data</p>
-    </li>
-    <li data-start="4987" data-end="5036">
-        <p data-start="4989" data-end="5036">Inferring relationships without full visibility</p>
-    </li>
-    <li data-start="5037" data-end="5088">
-        <p data-start="5039" data-end="5088">Representing uncertainty clearly in visualization</p>
-    </li>
-    <li data-start="5089" data-end="5130">
-        <p data-start="5091" data-end="5130">Balancing simplicity with useful detail</p>
-    </li>
-    <li data-start="5131" data-end="5179">
-        <p data-start="5133" data-end="5179">Reaching segmented or restricted network areas</p>
-    </li>
-    <li data-start="5180" data-end="5226">
-        <p data-start="5182" data-end="5226">Managing time alongside military obligations</p>
-    </li>
-</ul>
-<hr data-start="5228" data-end="5231" />
-<h1 data-start="5233" data-end="5255"><strong data-start="5235" data-end="5255">Publication Plan</strong></h1>
-<p data-start="5257" data-end="5570">NetTower will be published as a web-based project page documenting the system&rsquo;s purpose, design decisions, capabilities, and limitations. The source code and documentation will be made publicly available through a GitHub repository, and example visualizations will be included to demonstrate system functionality.</p>
+
