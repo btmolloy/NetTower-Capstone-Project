@@ -1,4 +1,4 @@
-<h1 data-start="234" data-end="247"><span style="font-size: 36pt;">NetTower - Capstone</span></h1>
+<h2 data-start="234" data-end="247"><span style="font-size: 36pt;">NetTower - Capstone</span></h2>
 <h1 data-start="340" data-end="359"><strong data-start="342" data-end="359">Project Links</strong></h1>
 <ul data-start="361" data-end="500">
     <li data-start="361" data-end="405">
@@ -127,7 +127,7 @@
 <h3 data-start="3069" data-end="3201">Project Architecture (In Progress)</h3>
 <p data-start="3069" data-end="3201">NetTower/<br />│<br />├── backEnd/<br />│&nbsp; &nbsp;<br />│&nbsp; &nbsp;<br />│<br />├── frontEnd/<br />│&nbsp;&nbsp;<br />│&nbsp; &nbsp;<br />│&nbsp; &nbsp;<br />│<br />└── tests/<br />&nbsp;&nbsp;</p>
 <hr data-start="3203" data-end="3206" />
-<h1 data-start="3208" data-end="3238"><strong data-start="3210" data-end="3238">Sprint Plan / Hard Deadlines</strong></h1>
+<h1 data-start="3208" data-end="3238"><strong data-start="3210" data-end="3238">Timeline:</strong></h1>
 <ul data-start="3463" data-end="3660">
     <li data-start="3636" data-end="3660">
         <p data-start="3638" data-end="3660">Sprints 1 &amp; 2 (Subject to adjustments)</p>
@@ -139,21 +139,24 @@
         <p data-start="3638" data-end="3660">Sprint 2<br />Phase Date Focus<br />S2W1 4/8/26 &ndash; 4/14/26 Visualization enhancements<br />S2W2 4/15/26 &ndash; 4/21/26 Refinement and performance testing<br />S2W3 4/22/26 &ndash; 4/28/26 Documentation and publication prep<br />S2W4 4/29/26 &ndash; 5/1/26 Final testing, demo, and submission</p>
     </li>
 </ul>
-<h3>Deadlines:</h3>
-<ul data-start="3463" data-end="3660">
-    <li data-start="3636" data-end="3660">
-        <p data-start="36" data-end="99"><strong data-start="36" data-end="71">Hard Deadline 1 &ndash; March 9, 2026</strong><br data-start="71" data-end="74" />Core Discovery Complete</p>
-        <p data-start="101" data-end="167">&nbsp;</p>
-    </li>
-    <li data-start="3636" data-end="3660">
-        <p data-start="101" data-end="167"><strong data-start="101" data-end="136">Hard Deadline 2 &ndash; April 7, 2026</strong><br data-start="136" data-end="139" />Functional Prototype Ready</p>
-        <p data-start="169" data-end="227" data-is-last-node="" data-is-only-node="">&nbsp;</p>
-    </li>
-    <li data-start="3636" data-end="3660"><strong>Hard Deadline 3 &ndash; April 21, 2026</strong><br />Refinement &amp; Testing Complete</li>
-    <li data-start="3636" data-end="3660">
-        <p data-start="169" data-end="227" data-is-last-node="" data-is-only-node=""><strong data-start="169" data-end="202">Hard Deadline 3 &ndash; May 1, 2026</strong><br data-start="202" data-end="205" />Finalized &amp; Published</p>
-    </li>
-</ul>
+<p>&nbsp;</p>
+<h3 data-start="554" data-end="583"><strong data-start="557" data-end="583">Milestones &amp; Deadlines</strong></h3>
+<h4 data-start="271" data-end="308">Milestone 1 &ndash; February 16, 2026</h4>
+<p data-start="309" data-end="344">Planning &amp; Architecture Finalized</p>
+<h4 data-start="351" data-end="388">Hard Deadline 1 &ndash; March 9, 2026</h4>
+<p data-start="389" data-end="414">Core Discovery Complete</p>
+<h4 data-start="421" data-end="455">Milestone 2 &ndash; March 24, 2026</h4>
+<p data-start="456" data-end="486">Connectivity Modeling Stable</p>
+<h4 data-start="493" data-end="530">Hard Deadline 2 &ndash; April 7, 2026</h4>
+<p data-start="531" data-end="559">Functional Prototype Ready</p>
+<h4 data-start="566" data-end="600">Milestone 3 &ndash; April 14, 2026</h4>
+<p data-start="601" data-end="640">Visualization Enhancements Integrated</p>
+<h4 data-start="647" data-end="685">Hard Deadline 3 &ndash; April 21, 2026</h4>
+<p data-start="686" data-end="717">Refinement &amp; Testing Complete</p>
+<h4 data-start="724" data-end="758">Milestone 4 &ndash; April 28, 2026</h4>
+<p data-start="759" data-end="790">Documentation &amp; Demo Prepared</p>
+<h4 data-start="797" data-end="832">Hard Deadline 4 &ndash; May 1, 2026</h4>
+<p data-start="833" data-end="856">Finalized &amp; Published</p>
 <p>&nbsp;</p>
 <hr data-start="3662" data-end="3665" />
 <h1 data-start="3667" data-end="3693"><strong data-start="3669" data-end="3693">Tools &amp; Technologies</strong></h1>
@@ -224,3 +227,56 @@
         <p data-start="4239" data-end="4286">Performance testing under varying device counts</p>
     </li>
 </ul>
+<p data-start="4288" data-end="4390">&nbsp;</p>
+<hr data-start="4392" data-end="4395" />
+<h1 data-start="4397" data-end="4419"><strong data-start="4399" data-end="4419">Learning with AI</strong></h1>
+<h3 data-start="4421" data-end="4440">Topics to Learn</h3>
+<ul data-start="4441" data-end="4586">
+    <li data-start="4441" data-end="4521">
+        <p data-start="4443" data-end="4521">Layer 2, Layer 3, and Layer 4 protocol behavior, limitations, and capabilities</p>
+    </li>
+    <li data-start="4522" data-end="4586">
+        <p data-start="4524" data-end="4586">Traffic packet structure and protocol breakdown at a low level</p>
+    </li>
+</ul>
+<h3 data-start="4588" data-end="4606">How AI Is Used</h3>
+<ul data-start="4607" data-end="4822">
+    <li data-start="4607" data-end="4654">
+        <p data-start="4609" data-end="4654">Breaking down protocol mechanics step-by-step</p>
+    </li>
+    <li data-start="4655" data-end="4698">
+        <p data-start="4657" data-end="4698">Exploring inference limits and edge cases</p>
+    </li>
+    <li data-start="4699" data-end="4760">
+        <p data-start="4701" data-end="4760">Supporting design decisions for discovery and visualization</p>
+    </li>
+    <li data-start="4761" data-end="4822">
+        <p data-start="4763" data-end="4822">Validating reasoning about constrained network environments</p>
+    </li>
+</ul>
+<p data-start="4824" data-end="4914">The AI component supports technical learning rather than adding AI-based product features.</p>
+<hr data-start="4916" data-end="4919" />
+<h1 data-start="4921" data-end="4945"><strong data-start="4923" data-end="4945">Challenges / Risks</strong></h1>
+<ul data-start="4947" data-end="5226">
+    <li data-start="4947" data-end="4986">
+        <p data-start="4949" data-end="4986">Incomplete or misleading network data</p>
+    </li>
+    <li data-start="4987" data-end="5036">
+        <p data-start="4989" data-end="5036">Inferring relationships without full visibility</p>
+    </li>
+    <li data-start="5037" data-end="5088">
+        <p data-start="5039" data-end="5088">Representing uncertainty clearly in visualization</p>
+    </li>
+    <li data-start="5089" data-end="5130">
+        <p data-start="5091" data-end="5130">Balancing simplicity with useful detail</p>
+    </li>
+    <li data-start="5131" data-end="5179">
+        <p data-start="5133" data-end="5179">Reaching segmented or restricted network areas</p>
+    </li>
+    <li data-start="5180" data-end="5226">
+        <p data-start="5182" data-end="5226">Managing time alongside military obligations</p>
+    </li>
+</ul>
+<hr data-start="5228" data-end="5231" />
+<h1 data-start="5233" data-end="5255"><strong data-start="5235" data-end="5255">Publication Plan</strong></h1>
+<p data-start="5257" data-end="5570">NetTower will be published as a web-based project page documenting the system&rsquo;s purpose, design decisions, capabilities, and limitations. The source code and documentation will be made publicly available through a GitHub repository, and example visualizations will be included to demonstrate system functionality.</p>
