@@ -1,4 +1,3 @@
-Repo for Capstone Project
 <h2 data-start="234" data-end="247"><span style="font-size: 36pt;">NetTower - Capstone</span></h2>
 <h1 data-start="340" data-end="359"><strong data-start="342" data-end="359">Project Links</strong></h1>
 <ul data-start="361" data-end="500">
@@ -28,54 +27,81 @@ Repo for Capstone Project
 <h1 data-start="1728" data-end="1742"><strong data-start="1730" data-end="1742">Features</strong></h1>
 <ul data-start="1744" data-end="2133">
     <li data-start="1744" data-end="1788">
-        <p data-start="1746" data-end="1788">Network Topology View (2D and optional 3D)</p>
-    </li>
-    <li data-start="1789" data-end="1846">
-        <p data-start="1791" data-end="1846">Node-Centric Exploration with expandable device details</p>
-    </li>
-    <li data-start="1847" data-end="1913">
-        <p data-start="1849" data-end="1913">Host Identification &amp; Classification with visual differentiation</p>
-    </li>
-    <li data-start="1914" data-end="1986">
-        <p data-start="1916" data-end="1986">Connectivity Representation showing observed or inferred relationships</p>
-    </li>
-    <li data-start="1987" data-end="2020">
-        <p data-start="1989" data-end="2020">Activity / Density Heat Mapping</p>
-    </li>
-    <li data-start="2021" data-end="2052">
-        <p data-start="2023" data-end="2052">Dynamic Network State Updates</p>
-    </li>
-    <li data-start="2053" data-end="2085">
-        <p data-start="2055" data-end="2085">Interactive Network Navigation</p>
-    </li>
-    <li data-start="2086" data-end="2133">
-        <p data-start="2088" data-end="2133">User-Controlled Scanning &amp; Discovery Settings</p>
-    </li>
-</ul>
-<p>&nbsp;</p>
-<hr data-start="2135" data-end="2138" />
-<h1 data-start="2140" data-end="2158"><strong data-start="2142" data-end="2158">Requirements</strong></h1>
-<ul data-start="2160" data-end="2674">
-    <li data-start="2160" data-end="2244">
-        <p data-start="2162" data-end="2244">The system shall discover reachable devices on a local or specified network range.</p>
-    </li>
-    <li data-start="2245" data-end="2314">
-        <p data-start="2247" data-end="2314">The system shall represent each discovered device as a visual node.</p>
-    </li>
-    <li data-start="2315" data-end="2394">
-        <p data-start="2317" data-end="2394">The system shall display inferred connectivity relationships between devices.</p>
-    </li>
-    <li data-start="2395" data-end="2466">
-        <p data-start="2397" data-end="2466">The system shall allow users to expand a node to view device details.</p>
-    </li>
-    <li data-start="2467" data-end="2551">
-        <p data-start="2469" data-end="2551">The system shall visually differentiate devices based on observed characteristics.</p>
-    </li>
-    <li data-start="2552" data-end="2604">
-        <p data-start="2554" data-end="2604">The system shall support adjustable scan settings.</p>
-    </li>
-    <li data-start="2605" data-end="2674">
-        <p data-start="2607" data-end="2674">The system shall update the visualization as network state changes.</p>
+        <p data-start="84" data-end="133"><strong data-start="84" data-end="133">1) Network Topology View (2D and optional 3D)</strong></p>
+        <ul data-start="134" data-end="312">
+            <li data-start="134" data-end="208">
+                <p data-start="136" data-end="208">The system shall represent discovered devices as a visual topology view.</p>
+            </li>
+            <li data-start="209" data-end="255">
+                <p data-start="211" data-end="255">The system shall support a 2D topology view.</p>
+            </li>
+            <li data-start="256" data-end="312">
+                <p data-start="258" data-end="312">The system shall support an optional 3D topology view.</p>
+            </li>
+        </ul>
+        <p data-start="314" data-end="345"><strong data-start="314" data-end="345">2) Node-Centric Exploration</strong></p>
+        <ul data-start="346" data-end="504">
+            <li data-start="346" data-end="419">
+                <p data-start="348" data-end="419">The system shall represent each discovered device as a selectable node.</p>
+            </li>
+            <li data-start="420" data-end="504">
+                <p data-start="422" data-end="504">The system shall allow users to expand a node to view detailed device information.</p>
+            </li>
+        </ul>
+        <p data-start="506" data-end="549"><strong data-start="506" data-end="549">3) Host Identification &amp; Classification</strong></p>
+        <ul data-start="550" data-end="728">
+            <li data-start="550" data-end="650">
+                <p data-start="552" data-end="650">The system shall identify devices based on observed characteristics (e.g., OS family/device type).</p>
+            </li>
+            <li data-start="651" data-end="728">
+                <p data-start="653" data-end="728">The system shall visually differentiate nodes based on host classification.</p>
+            </li>
+        </ul>
+        <p data-start="730" data-end="764"><strong data-start="730" data-end="764">4) Connectivity Representation</strong></p>
+        <ul data-start="765" data-end="941">
+            <li data-start="765" data-end="856">
+                <p data-start="767" data-end="856">The system shall display observed or inferred connectivity relationships between devices.</p>
+            </li>
+            <li data-start="857" data-end="941">
+                <p data-start="859" data-end="941">The system shall render relationships as links between nodes in the topology view.</p>
+            </li>
+        </ul>
+        <p data-start="943" data-end="981"><strong data-start="943" data-end="981">5) Activity / Density Heat Mapping</strong></p>
+        <ul data-start="982" data-end="1165">
+            <li data-start="982" data-end="1088">
+                <p data-start="984" data-end="1088">The system shall provide an optional heat-map overlay showing relative activity or device concentration.</p>
+            </li>
+            <li data-start="1089" data-end="1165">
+                <p data-start="1091" data-end="1165">The system shall update the overlay to reflect current network state data.</p>
+            </li>
+        </ul>
+        <p data-start="1167" data-end="1203"><strong data-start="1167" data-end="1203">6) Dynamic Network State Updates</strong></p>
+        <ul data-start="1204" data-end="1386">
+            <li data-start="1204" data-end="1297">
+                <p data-start="1206" data-end="1297">The system shall update the visualization when devices appear, disappear, or change status.</p>
+            </li>
+            <li data-start="1298" data-end="1386">
+                <p data-start="1300" data-end="1386">The system shall maintain the current network view to reflect the latest scan results.</p>
+            </li>
+        </ul>
+        <p data-start="1388" data-end="1425"><strong data-start="1388" data-end="1425">7) Interactive Network Navigation</strong></p>
+        <ul data-start="1426" data-end="1572">
+            <li data-start="1426" data-end="1490">
+                <p data-start="1428" data-end="1490">The system shall allow users to pan and zoom the network view.</p>
+            </li>
+            <li data-start="1491" data-end="1572">
+                <p data-start="1493" data-end="1572">The system shall allow users to reposition nodes to support focused inspection.</p>
+            </li>
+        </ul>
+        <p data-start="1574" data-end="1626"><strong data-start="1574" data-end="1626">8) User-Controlled Scanning &amp; Discovery Settings</strong></p>
+        <ul data-start="1627" data-end="1826" data-is-last-node="" data-is-only-node="">
+            <li data-start="1627" data-end="1726">
+                <p data-start="1629" data-end="1726">The system shall allow users to discover reachable devices on a local or specified network range.</p>
+            </li>
+            <li data-start="1727" data-end="1826" data-is-last-node="">
+                <p data-start="1729" data-end="1826" data-is-last-node="">The system shall support adjustable scan settings (e.g., scan frequency and target range/subnet).</p>
+            </li>
+        </ul>
     </li>
 </ul>
 <p>&nbsp;</p>
@@ -101,7 +127,7 @@ Repo for Capstone Project
 <h3 data-start="3069" data-end="3201">Project Architecture (In Progress)</h3>
 <p data-start="3069" data-end="3201">NetTower/<br />│<br />├── backEnd/<br />│&nbsp; &nbsp;<br />│&nbsp; &nbsp;<br />│<br />├── frontEnd/<br />│&nbsp;&nbsp;<br />│&nbsp; &nbsp;<br />│&nbsp; &nbsp;<br />│<br />└── tests/<br />&nbsp;&nbsp;</p>
 <hr data-start="3203" data-end="3206" />
-<h1 data-start="3208" data-end="3238"><strong data-start="3210" data-end="3238">Sprint Plan / Hard Deadlines</strong></h1>
+<h1 data-start="3208" data-end="3238"><strong data-start="3210" data-end="3238">Timeline:</strong></h1>
 <ul data-start="3463" data-end="3660">
     <li data-start="3636" data-end="3660">
         <p data-start="3638" data-end="3660">Sprints 1 &amp; 2 (Subject to adjustments)</p>
@@ -113,21 +139,24 @@ Repo for Capstone Project
         <p data-start="3638" data-end="3660">Sprint 2<br />Phase Date Focus<br />S2W1 4/8/26 &ndash; 4/14/26 Visualization enhancements<br />S2W2 4/15/26 &ndash; 4/21/26 Refinement and performance testing<br />S2W3 4/22/26 &ndash; 4/28/26 Documentation and publication prep<br />S2W4 4/29/26 &ndash; 5/1/26 Final testing, demo, and submission</p>
     </li>
 </ul>
-<h3>Deadlines:</h3>
-<ul data-start="3463" data-end="3660">
-    <li data-start="3636" data-end="3660">
-        <p data-start="36" data-end="99"><strong data-start="36" data-end="71">Hard Deadline 1 &ndash; March 9, 2026</strong><br data-start="71" data-end="74" />Core Discovery Complete</p>
-        <p data-start="101" data-end="167">&nbsp;</p>
-    </li>
-    <li data-start="3636" data-end="3660">
-        <p data-start="101" data-end="167"><strong data-start="101" data-end="136">Hard Deadline 2 &ndash; April 7, 2026</strong><br data-start="136" data-end="139" />Functional Prototype Ready</p>
-        <p data-start="169" data-end="227" data-is-last-node="" data-is-only-node="">&nbsp;</p>
-    </li>
-    <li data-start="3636" data-end="3660"><strong>Hard Deadline 3 &ndash; April 21, 2026</strong><br />Refinement &amp; Testing Complete</li>
-    <li data-start="3636" data-end="3660">
-        <p data-start="169" data-end="227" data-is-last-node="" data-is-only-node=""><strong data-start="169" data-end="202">Hard Deadline 3 &ndash; May 1, 2026</strong><br data-start="202" data-end="205" />Finalized &amp; Published</p>
-    </li>
-</ul>
+<p>&nbsp;</p>
+<h3 data-start="554" data-end="583"><strong data-start="557" data-end="583">Milestones &amp; Deadlines</strong></h3>
+<h4 data-start="271" data-end="308">Milestone 1 &ndash; February 16, 2026</h4>
+<p data-start="309" data-end="344">Planning &amp; Architecture Finalized</p>
+<h4 data-start="351" data-end="388">Hard Deadline 1 &ndash; March 9, 2026</h4>
+<p data-start="389" data-end="414">Core Discovery Complete</p>
+<h4 data-start="421" data-end="455">Milestone 2 &ndash; March 24, 2026</h4>
+<p data-start="456" data-end="486">Connectivity Modeling Stable</p>
+<h4 data-start="493" data-end="530">Hard Deadline 2 &ndash; April 7, 2026</h4>
+<p data-start="531" data-end="559">Functional Prototype Ready</p>
+<h4 data-start="566" data-end="600">Milestone 3 &ndash; April 14, 2026</h4>
+<p data-start="601" data-end="640">Visualization Enhancements Integrated</p>
+<h4 data-start="647" data-end="685">Hard Deadline 3 &ndash; April 21, 2026</h4>
+<p data-start="686" data-end="717">Refinement &amp; Testing Complete</p>
+<h4 data-start="724" data-end="758">Milestone 4 &ndash; April 28, 2026</h4>
+<p data-start="759" data-end="790">Documentation &amp; Demo Prepared</p>
+<h4 data-start="797" data-end="832">Hard Deadline 4 &ndash; May 1, 2026</h4>
+<p data-start="833" data-end="856">Finalized &amp; Published</p>
 <p>&nbsp;</p>
 <hr data-start="3662" data-end="3665" />
 <h1 data-start="3667" data-end="3693"><strong data-start="3669" data-end="3693">Tools &amp; Technologies</strong></h1>
