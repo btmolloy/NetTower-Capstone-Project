@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NetTower - Baseline Discovery</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; max-width: 900px; }
+    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    input { padding: 10px; width: 240px; }
+    button { padding: 10px 14px; cursor: pointer; }
+    pre { background: #f4f4f4; padding: 12px; border-radius: 8px; overflow: auto; }
+    .muted { color: #666; font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+  <h1>NetTower</h1>
+  <p class="muted">S1W1 baseline: frontend + backend call that returns discovery results.</p>
+
+  <div class="row">
+    <label for="subnet"><strong>Subnet:</strong></label>
+    <input id="subnet" value="10.10.30.0/24" />
+    <button id="runBtn">Run Discovery</button>
+    <button id="healthBtn">Health</button>
+  </div>
+
+  <h3>Output</h3>
+  <pre id="out">Click “Run Discovery”.</pre>
+
+  <script>
+    // Change this if your backend runs elsewhere
+    const API_BASE = "http://127.0.0.1:8000";
+
+    const outEl = document.getElementById("out");
+    const subnetEl = document.getElementById("subnet");
+
+    document.getElementById("healthBtn").addEventListener("click", async () => {
+      outEl.textContent = "Checking health...";
+      try {
+        const res = await fetch(`${API_BASE}/api/health`);
+        const data = await res.json();
+        outEl.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        outEl.textContent = `Health check failed: ${e}`;
+      }
+    });
+
+    document.getElementById("runBtn").addEventListener("click", async () => {
+      const subnet = subnetEl.value.trim();
+      outEl.textContent = "Running discovery...";
+      try {
+        const url = `${API_BASE}/api/discover?subnet=${encodeURIComponent(subnet)}`;
+        const res = await fetch(url);
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`HTTP ${res.status}: ${text}`);
+        }
+        const data = await res.json();
+        outEl.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        outEl.textContent = `Discovery failed: ${e}`;
+      }
+    });
+  </script>
+</body>
+</html>
