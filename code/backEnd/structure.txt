@@ -1,0 +1,45 @@
+NetTower/
+└─ code/
+   ├─ frontEnd/
+   │  ├─ app.py
+   │  ├─ templates/
+   │  │  └─ index.html
+   │  └─ static/
+   │     ├─ css/
+   │     └─ js/
+   │
+   └─ backEnd/
+      ├─ __init__.py                  # kept (backend package root)
+      ├─ main.py                      # orchestrator + pipeline loop + scan scheduling
+      ├─ config.py                    # config object + defaults (intervals, iface, targets, mongo)
+      ├─ settings.py                  # user input layer (CLI/UI later) + validation calls
+      │
+      ├─ models/
+      │  ├─ __init__.py               # kept (models package for clean imports)
+      │  ├─ events.py                 # Event objects passed through pipeline (NOT stored by default)
+      │  ├─ entities.py               # Entity objects representing DB state (stored)
+      │  └─ types.py                  # Enums/shared types used by events/entities (Source, Proto, Confidence)
+      │
+      ├─ pipeline/
+      │  └─ event_bus.py              # publish/subscribe queue for Events (thread-safe)
+      │
+      ├─ sensors/
+      │  ├─ passive_listener.py       # starts tcpdump, emits packet-derived Events + flow summaries
+      │  └─ active_discovery.py       # runs targeted/interval scans (nmap/ping), emits Events
+      │
+      ├─ processors/
+      │  ├─ extractors.py             # normalize raw sensor outputs into canonical Event objects
+      │  ├─ enrichment.py             # add meaning (vendor/OUI, OS guess, role hints) using resources/*
+      │  └─ correlation.py            # uses Librarian read-only lookups to decide new/existing + outputs entity updates + signals
+      │
+      ├─ storage/
+      │  ├─ mongo_client.py           # Mongo connection + index setup + collection handles
+      │  └─ librarian.py              # write/upsert Entities + read-only lookups for Correlation
+      │
+      ├─ resources/
+      │  ├─ oui_vendors.json          # MAC OUI prefix -> vendor name
+      │  └─ device_hints.json         # optional: vendor/category/role hints (router/printer/server)
+      │
+      └─ utils/
+         ├─ logging.py                # shared logger setup + get_logger()
+         └─ net.py                    # IP/CIDR/MAC helpers + validation + normalization

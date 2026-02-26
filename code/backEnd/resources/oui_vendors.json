@@ -1,0 +1,5 @@
+code/backEnd/resources/oui_vendors.json
+
+Purpose: Static mapping for MAC OUI prefix → vendor name. Used by enrichment.
+Inputs: Loaded by enrichment at startup.
+Outputs: Vendor strings attached to events/entities.

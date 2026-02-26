@@ -1,0 +1,5 @@
+code/backEnd/resources/device_hints.json
+
+Purpose: Optional mapping of vendors/ouis to “hints” (device category/role).
+Inputs: Loaded by enrichment.
+Outputs: Role/category hints attached to events/entities.
