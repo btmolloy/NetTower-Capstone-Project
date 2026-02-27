@@ -1,5 +1,24 @@
-code/backEnd/resources/device_hints.json
-
-Purpose: Optional mapping of vendors/ouis to “hints” (device category/role).
-Inputs: Loaded by enrichment.
-Outputs: Role/category hints attached to events/entities.
+{
+  "vendor_to_role": {
+    "Ubiquiti": "network",
+    "Cisco": "network",
+    "Hewlett Packard": "server",
+    "HP": "server",
+    "Dell": "workstation",
+    "Raspberry Pi": "iot",
+    "Apple": "client",
+    "Samsung": "client"
+  },
+  "oui_to_role": {
+    "fc:ec:da": "network",
+    "b8:27:eb": "iot"
+  },
+  "hostname_keywords_to_role": {
+    "printer": "printer",
+    "ap": "network",
+    "switch": "network",
+    "router": "network",
+    "nas": "storage",
+    "camera": "iot"
+  }
+}
