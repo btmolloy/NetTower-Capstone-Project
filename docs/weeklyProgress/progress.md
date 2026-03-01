@@ -11,23 +11,24 @@
     </li>
 </ul>
 <hr />
-<h2 data-start="554" data-end="583"><strong data-start="557" data-end="583">Milestones &amp; Deadlines</strong></h2>
-<h3 data-start="271" data-end="308">Milestone 1 &ndash; February 16, 2026</h3>
-<p data-start="309" data-end="344">Planning &amp; Architecture Finalized</p>
-<h3 data-start="351" data-end="388">Hard Deadline 1 &ndash; March 9, 2026</h3>
-<p data-start="389" data-end="414">Core Discovery Complete</p>
-<h3 data-start="421" data-end="455">Milestone 2 &ndash; March 24, 2026</h3>
-<p data-start="456" data-end="486">Connectivity Modeling Stable</p>
-<h3 data-start="493" data-end="530">Hard Deadline 2 &ndash; April 7, 2026</h3>
-<p data-start="531" data-end="559">Functional Prototype Ready</p>
-<h3 data-start="566" data-end="600">Milestone 3 &ndash; April 14, 2026</h3>
-<p data-start="601" data-end="640">Visualization Enhancements Integrated</p>
-<h3 data-start="647" data-end="685">Hard Deadline 3 &ndash; April 21, 2026</h3>
+<h3 data-start="554" data-end="583"><strong data-start="557" data-end="583">Milestones &amp; Deadlines</strong></h3>
+<h4 data-start="271" data-end="308">Milestone 1 &ndash; February 16, 2026</h4>
+<p data-start="2151" data-end="2194">Planning &amp; Backend Architecture Finalized</p>
+<h4 data-start="351" data-end="388">Hard Deadline 1 &ndash; March 9, 2026</h4>
+<p data-start="2241" data-end="2288">Backend Core Complete (Sprint 1 Presentation)</p>
+<h4 data-start="421" data-end="455">Milestone 2 &ndash; March 24, 2026</h4>
+<p data-start="1230" data-end="1263">Frontend Integration Functional</p>
+<h4 data-start="493" data-end="530">Hard Deadline 2 &ndash; April 7, 2026</h4>
+<p data-start="2015" data-end="2077">Functional Prototype Ready (Backend + Initial Visualization)</p>
+<h4 data-start="566" data-end="600">Milestone 3 &ndash; April 14, 2026</h4>
+<p data-start="1412" data-end="1451">Visualization Enhancements Integrated</p>
+<h4 data-start="647" data-end="685">Hard Deadline 3 &ndash; April 21, 2026</h4>
 <p data-start="686" data-end="717">Refinement &amp; Testing Complete</p>
-<h3 data-start="724" data-end="758">Milestone 4 &ndash; April 28, 2026</h3>
+<h4 data-start="724" data-end="758">Milestone 4 &ndash; April 28, 2026</h4>
 <p data-start="759" data-end="790">Documentation &amp; Demo Prepared</p>
-<h3 data-start="797" data-end="832">Hard Deadline 4 &ndash; May 1, 2026</h3>
+<h4 data-start="797" data-end="832">Hard Deadline 4 &ndash; May 1, 2026</h4>
 <p data-start="833" data-end="856">Finalized &amp; Published</p>
+<p data-start="833" data-end="856">&nbsp;</p>
 <hr data-start="960" data-end="963" />
 <h2 data-start="965" data-end="1011"><strong data-start="968" data-end="1011">Major Features Included in Project Plan</strong></h2>
 <ul data-start="1013" data-end="1314">
@@ -75,7 +76,7 @@
     </li>
 </ul>
 <p data-start="484" data-end="496"><strong data-start="484" data-end="492">LoC:</strong> 0</p>
-<h3 data-start="498" data-end="514"><strong data-start="502" data-end="512">Week 5</strong></h3>
+<h3 data-start="498" data-end="514"><strong data-start="502" data-end="512">Week 5 (2/16)</strong></h3>
 <ul data-start="515" data-end="596">
     <li data-start="515" data-end="544">
         <p data-start="517" data-end="544">Created GitHub repository</p>
@@ -83,5 +84,30 @@
     <li data-start="545" data-end="596">
         <p data-start="547" data-end="596">Established initial project directory structure</p>
     </li>
+    <li data-start="545" data-end="596"><strong>MILESTONE 1</strong>: Complete - Planning &amp; Backend Architecture Finalized</li>
 </ul>
 <p data-start="598" data-end="610"><strong data-start="598" data-end="606">LoC:</strong> 0</p>
+<h3 data-start="498" data-end="514"><strong data-start="502" data-end="512">Week 6 (2/23)</strong></h3>
+<ul data-start="515" data-end="596">
+    <li data-start="515" data-end="544">
+        <p data-start="517" data-end="544">Focus: <span>Project setup and baseline agentless discovery</span></p>
+    </li>
+    <li data-start="515" data-end="544"><span>Implemented core backend structure</span></li>
+    <li data-start="515" data-end="544"><span>Developed event models, entity models, and EventBus system</span></li>
+    <li data-start="515" data-end="544"><span>Integrated MongoDB connection and storage layer</span></li>
+</ul>
+<p data-start="598" data-end="610"><strong data-start="598" data-end="606">LoC this week:</strong>&nbsp; 744</p>
+<p data-start="598" data-end="610"><strong>LoC Total:</strong> 744</p>
+<h3 data-start="498" data-end="514"><strong data-start="502" data-end="512">Week 7 (3/2)</strong></h3>
+<ul data-start="515" data-end="596">
+    <li data-start="515" data-end="544">
+        <p data-start="517" data-end="544">Focus: <span>Complete Back-end</span></p>
+    </li>
+    <li data-start="515" data-end="544"><span>Integrated passive listener and active discovery</span></li>
+    <li data-start="515" data-end="544"><span>Implemented host correlation and edge relationship modeling</span></li>
+    <li data-start="515" data-end="544"><span>Integrated enrichment (OUI + device hints)</span></li>
+    <li data-start="515" data-end="544"><span>Finalized main orchestrator loop and stabilized pipeline</span></li>
+    <li data-start="515" data-end="544"><span><strong>DEADLINE 1</strong>: Complete - Backend Core Complete (Sprint 1 Presentation)</span></li>
+</ul>
+<p data-start="598" data-end="610"><strong data-start="598" data-end="606">LoC this week:</strong> &nbsp;1,042</p>
+<p data-start="598" data-end="610"><strong>LoC Total:</strong> 1,786</p>
