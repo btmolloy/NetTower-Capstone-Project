@@ -133,24 +133,28 @@
         <p data-start="3638" data-end="3660">Sprints 1 &amp; 2 (Subject to adjustments)</p>
     </li>
     <li data-start="3636" data-end="3660">
-        <p data-start="3638" data-end="3660">Sprint 1<br />Phase Date Focus<br />S1W1 2/9/26 &ndash; 2/23/26 Project setup and baseline agentless discovery<br />S1W2 2/24/26 &ndash; 3/9/26 Network scanning and host identification<br />S1W3 3/10/26 &ndash; 3/24/26 Basic connectivity inference and relationship modeling<br />S1W4 3/25/26 &ndash; 4/7/26 Initial topology visualization</p>
-    </li>
-    <li data-start="3636" data-end="3660">
-        <p data-start="3638" data-end="3660">Sprint 2<br />Phase Date Focus<br />S2W1 4/8/26 &ndash; 4/14/26 Visualization enhancements<br />S2W2 4/15/26 &ndash; 4/21/26 Refinement and performance testing<br />S2W3 4/22/26 &ndash; 4/28/26 Documentation and publication prep<br />S2W4 4/29/26 &ndash; 5/1/26 Final testing, demo, and submission</p>
+        <p data-start="3638" data-end="3660">Sprint 1<br />Phase Date Focus<br />S1W1 (Week 5 &ndash; 2/9) Project setup and baseline agentless discovery<br />S1W2 (Week 6 &ndash; 2/16) Network scanning and host identification<br />S1W3 (Week 7 &ndash; 2/23) Basic connectivity inference and relationship modeling<br />S1W4 (Week 8 &ndash; 3/2) Backend Completion &amp; Stability</p>
     </li>
 </ul>
+<p>Sprint 1 Presentation (3/2)</p>
+<ul data-start="3463" data-end="3660">
+    <li data-start="3636" data-end="3660">
+        <p data-start="3638" data-end="3660">Sprint 2<br />Phase Date Focus<br />S2W1 (Week 10 &ndash; 3/16) Building Front End<br />S2W2 (Week 11 &ndash; 3/23) Refinement of front end and Visual enhancement<br />S2W3 (Week 12 &ndash; 3/30) Frontend&ndash;Backend Integration &amp; Topology Rendering<br />S2W4 (Week 13 &ndash; 4/6) Performance Optimization &amp; System Refinement + User Testing<br />S2W5 (Week 14 &ndash; 4/13) Documentation and publication prep<br />S2W6 (Week 15 &ndash; 4/20) Final testing, demo, and submission</p>
+    </li>
+</ul>
+<p>Week 16 (4/27) Final Presentation</p>
 <p>&nbsp;</p>
 <h3 data-start="554" data-end="583"><strong data-start="557" data-end="583">Milestones &amp; Deadlines</strong></h3>
 <h4 data-start="271" data-end="308">Milestone 1 &ndash; February 16, 2026</h4>
-<p data-start="309" data-end="344">Planning &amp; Architecture Finalized</p>
+<p data-start="2151" data-end="2194">Planning &amp; Backend Architecture Finalized</p>
 <h4 data-start="351" data-end="388">Hard Deadline 1 &ndash; March 9, 2026</h4>
-<p data-start="389" data-end="414">Core Discovery Complete</p>
+<p data-start="2241" data-end="2288">Backend Core Complete (Sprint 1 Presentation)</p>
 <h4 data-start="421" data-end="455">Milestone 2 &ndash; March 24, 2026</h4>
-<p data-start="456" data-end="486">Connectivity Modeling Stable</p>
+<p data-start="1230" data-end="1263">Frontend Integration Functional</p>
 <h4 data-start="493" data-end="530">Hard Deadline 2 &ndash; April 7, 2026</h4>
-<p data-start="531" data-end="559">Functional Prototype Ready</p>
+<p data-start="2015" data-end="2077">Functional Prototype Ready (Backend + Initial Visualization)</p>
 <h4 data-start="566" data-end="600">Milestone 3 &ndash; April 14, 2026</h4>
-<p data-start="601" data-end="640">Visualization Enhancements Integrated</p>
+<p data-start="1412" data-end="1451">Visualization Enhancements Integrated</p>
 <h4 data-start="647" data-end="685">Hard Deadline 3 &ndash; April 21, 2026</h4>
 <p data-start="686" data-end="717">Refinement &amp; Testing Complete</p>
 <h4 data-start="724" data-end="758">Milestone 4 &ndash; April 28, 2026</h4>
