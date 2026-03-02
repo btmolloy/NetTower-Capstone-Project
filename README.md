@@ -155,11 +155,11 @@
 <p data-start="2015" data-end="2077">Functional Prototype Ready (Backend + Initial Visualization)</p>
 <h4 data-start="566" data-end="600">Milestone 3 &ndash; April 14, 2026</h4>
 <p data-start="1412" data-end="1451">Visualization Enhancements Integrated</p>
-<h4 data-start="647" data-end="685">Hard Deadline 3 &ndash; April 21, 2026</h4>
+<h4 data-start="647" data-end="685">Hard Deadline 3 &ndash; April 17, 2026</h4>
 <p data-start="686" data-end="717">Refinement &amp; Testing Complete</p>
-<h4 data-start="724" data-end="758">Milestone 4 &ndash; April 28, 2026</h4>
+<h4 data-start="724" data-end="758">Milestone 4 &ndash; April 19, 2026</h4>
 <p data-start="759" data-end="790">Documentation &amp; Demo Prepared</p>
-<h4 data-start="797" data-end="832">Hard Deadline 4 &ndash; May 1, 2026</h4>
+<h4 data-start="797" data-end="832">Hard Deadline 4 &ndash; April 22, 2026</h4>
 <p data-start="833" data-end="856">Finalized &amp; Published</p>
 <p>&nbsp;</p>
 <hr data-start="3662" data-end="3665" />
