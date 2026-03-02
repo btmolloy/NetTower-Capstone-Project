@@ -131,8 +131,8 @@ def main() -> None:
 
     except KeyboardInterrupt:
         log.info("KeyboardInterrupt received, shutting down...")
-    except Exception as exc:
-        log.error(f"Fatal error in main loop: {exc}")
+    except Exception:
+        log.exception("Fatal error in main loop")
     finally:
         # -----------------------------
         # Shutdown

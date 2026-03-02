@@ -104,8 +104,8 @@ class edge_entity:
             "first_seen": self.first_seen,
             "last_seen": self.last_seen,
             "count": int(self.count),
-            "ports": sorted([(sp, dp) for (sp, dp) in self.ports]),
-        }
+            "ports": sorted([(sp, dp) for (sp, dp) in self.ports if isinstance(sp, int) and isinstance(dp, int)]),        
+            }
 
     @staticmethod
     def from_dict(doc: dict[str, Any]) -> "edge_entity":

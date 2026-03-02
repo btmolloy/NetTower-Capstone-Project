@@ -21,7 +21,7 @@ class config:
     log_file: str | None = None
 
     # Network interface
-    interface: str = "eth0"
+    interface: str = "en0"
 
     # Discovery scheduling
     discovery_interval_seconds: int = 120
@@ -36,7 +36,9 @@ class config:
 
     # Feature toggles
     enable_passive_listener: bool = True
-    enable_active_discovery: bool = True
+    enable_active_discovery: bool = False
+# set the bool value to false to disable active
+
 
     @staticmethod
     def from_env() -> "config":
@@ -48,7 +50,7 @@ class config:
         return config(
             log_level=os.getenv("NETTOWER_LOG_LEVEL", "INFO"),
             log_file=os.getenv("NETTOWER_LOG_FILE") or None,
-            interface=os.getenv("NETTOWER_INTERFACE", "eth0"),
+            interface=os.getenv("NETTOWER_INTERFACE", "en0"),
             discovery_interval_seconds=int(
                 os.getenv("NETTOWER_DISCOVERY_INTERVAL", "20")
             ),
@@ -68,6 +70,8 @@ class config:
                 "NETTOWER_ENABLE_PASSIVE", "1"
             ) == "1",
             enable_active_discovery=os.getenv(
-                "NETTOWER_ENABLE_ACTIVE", "1"
+                "NETTOWER_ENABLE_ACTIVE", "0"
             ) == "1",
+
+            #set the first number above to 0 to disable active
         )

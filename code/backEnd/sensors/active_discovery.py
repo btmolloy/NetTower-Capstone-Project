@@ -10,8 +10,8 @@ from backEnd.models.types import event_meta, sensor_source, protocol, confidence
 from backEnd.utils.logging import get_logger
 from backEnd.utils.net import normalize_cidr, normalize_ip, is_valid_ip, is_valid_cidr
 
-"""
-    def run_discovery(cfg: Any, bus: Any, target: str) -> None:
+
+def run_discovery(cfg: Any, bus: Any, target: str) -> None:
         """
         Run an active discovery job.
 
@@ -37,7 +37,7 @@ from backEnd.utils.net import normalize_cidr, normalize_ip, is_valid_ip, is_vali
         log.warning(f"active discovery: invalid target '{target}' (expected IP or CIDR)")
 
 
-    def _iter_cidr_hosts(cidr: str) -> Iterable[str]:
+def _iter_cidr_hosts(cidr: str) -> Iterable[str]:
         net = ipaddress.ip_network(cidr, strict=False)
 
         # IMPORTANT: for large networks this can be huge; later you can cap/slice or parallelize.
@@ -45,7 +45,7 @@ from backEnd.utils.net import normalize_cidr, normalize_ip, is_valid_ip, is_vali
             yield str(host)
 
 
-    def _ping_and_publish(cfg: Any, bus: Any, ip: str) -> None:
+def _ping_and_publish(cfg: Any, bus: Any, ip: str) -> None:
         iface = getattr(cfg, "interface", "eth0")
         timeout_seconds = int(getattr(cfg, "active_ping_timeout_seconds", 1))
         do_nmap = bool(getattr(cfg, "enable_nmap", False))
@@ -64,7 +64,7 @@ from backEnd.utils.net import normalize_cidr, normalize_ip, is_valid_ip, is_vali
                 _nmap_ports(cfg, bus, ip, iface=iface)
 
 
-    def _ping(ip: str, timeout_seconds: int = 1) -> bool:
+def _ping(ip: str, timeout_seconds: int = 1) -> bool:
         """
         Cross-platform ping. Best-effort.
 
@@ -93,7 +93,7 @@ from backEnd.utils.net import normalize_cidr, normalize_ip, is_valid_ip, is_vali
             return False
 
 
-    def _nmap_ports(cfg: Any, bus: Any, ip: str, iface: str) -> None:
+def _nmap_ports(cfg: Any, bus: Any, ip: str, iface: str) -> None:
         """
         Optional nmap scan. Emits port_seen events.
         If nmap isn't installed, silently skips.
@@ -141,7 +141,7 @@ from backEnd.utils.net import normalize_cidr, normalize_ip, is_valid_ip, is_vali
             )
 
 
-    def _parse_nmap_ports(output: str) -> list[tuple[int, protocol, str]]:
+def _parse_nmap_ports(output: str) -> list[tuple[int, protocol, str]]:
         """
         Very small parser for common nmap output lines like:
         22/tcp open  ssh
@@ -179,4 +179,3 @@ from backEnd.utils.net import normalize_cidr, normalize_ip, is_valid_ip, is_vali
 
 
 
-"""
