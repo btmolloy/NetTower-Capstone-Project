@@ -22,11 +22,11 @@
 <p data-start="2015" data-end="2077">Functional Prototype Ready (Backend + Initial Visualization)</p>
 <h4 data-start="566" data-end="600">Milestone 3 &ndash; April 14, 2026</h4>
 <p data-start="1412" data-end="1451">Visualization Enhancements Integrated</p>
-<h4 data-start="647" data-end="685">Hard Deadline 3 &ndash; April 21, 2026</h4>
+<h4 data-start="647" data-end="685">Hard Deadline 3 &ndash; April 17, 2026</h4>
 <p data-start="686" data-end="717">Refinement &amp; Testing Complete</p>
-<h4 data-start="724" data-end="758">Milestone 4 &ndash; April 28, 2026</h4>
+<h4 data-start="724" data-end="758">Milestone 4 &ndash; April 19, 2026</h4>
 <p data-start="759" data-end="790">Documentation &amp; Demo Prepared</p>
-<h4 data-start="797" data-end="832">Hard Deadline 4 &ndash; May 1, 2026</h4>
+<h4 data-start="797" data-end="832">Hard Deadline 4 &ndash; April 22, 2026</h4>
 <p data-start="833" data-end="856">Finalized &amp; Published</p>
 <p data-start="833" data-end="856">&nbsp;</p>
 <hr data-start="960" data-end="963" />
@@ -66,7 +66,7 @@
 <p data-start="329" data-end="334">N/A</p>
 <h3 data-start="336" data-end="352"><strong data-start="340" data-end="350">Week 3</strong></h3>
 <p data-start="353" data-end="358">N/A</p>
-<h3 data-start="360" data-end="376"><strong data-start="364" data-end="374">Week 4</strong></h3>
+<h3 data-start="360" data-end="376"><strong data-start="364" data-end="374">Week 4 (2/9)&nbsp; </strong><strong data-start="502" data-end="512"><span style="font-size: 12pt;">(Note: Date marks end of week.)</span></strong></h3>
 <ul data-start="377" data-end="482">
     <li data-start="377" data-end="422">
         <p data-start="379" data-end="422">Completed Project Plan Presentation (PPP)</p>
@@ -76,7 +76,7 @@
     </li>
 </ul>
 <p data-start="484" data-end="496"><strong data-start="484" data-end="492">LoC:</strong> 0</p>
-<h3 data-start="498" data-end="514"><strong data-start="502" data-end="512">Week 5 (2/16)</strong></h3>
+<h3 data-start="498" data-end="514"><strong data-start="502" data-end="512">Week 5 (2/16) <span style="font-size: 12pt;">(Note: Date marks end of week.)</span></strong></h3>
 <ul data-start="515" data-end="596">
     <li data-start="515" data-end="544">
         <p data-start="517" data-end="544">Created GitHub repository</p>
@@ -87,7 +87,7 @@
     <li data-start="545" data-end="596"><strong>MILESTONE 1</strong>: Complete - Planning &amp; Backend Architecture Finalized</li>
 </ul>
 <p data-start="598" data-end="610"><strong data-start="598" data-end="606">LoC:</strong> 0</p>
-<h3 data-start="498" data-end="514"><strong data-start="502" data-end="512">Week 6 (2/23)</strong></h3>
+<h3 data-start="498" data-end="514"><strong data-start="502" data-end="512">Week 6 (2/23) </strong><strong data-start="502" data-end="512"><span style="font-size: 12pt;">(Note: Date marks end of week.)</span></strong></h3>
 <ul data-start="515" data-end="596">
     <li data-start="515" data-end="544">
         <p data-start="517" data-end="544">Focus: <span>Project setup and baseline agentless discovery</span></p>
@@ -98,7 +98,7 @@
 </ul>
 <p data-start="598" data-end="610"><strong data-start="598" data-end="606">LoC this week:</strong>&nbsp; 744</p>
 <p data-start="598" data-end="610"><strong>LoC Total:</strong> 744</p>
-<h3 data-start="498" data-end="514"><strong data-start="502" data-end="512">Week 7 (3/2)</strong></h3>
+<h3 data-start="498" data-end="514"><strong data-start="502" data-end="512">Week 7 (3/2) </strong><strong data-start="502" data-end="512"><span style="font-size: 12pt;">(Note: Date marks end of week.)</span></strong></h3>
 <ul data-start="515" data-end="596">
     <li data-start="515" data-end="544">
         <p data-start="517" data-end="544">Focus: <span>Complete Back-end</span></p>
