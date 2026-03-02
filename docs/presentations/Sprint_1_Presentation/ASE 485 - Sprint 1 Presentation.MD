@@ -127,9 +127,7 @@ NetTower/
 
 ## Sprint 1: Demo Part 2
 
-*(Diagram Placeholder)*
-
-WILL PUT DIAGRAM HERE
+SEE PDF FOR DEMO SCREENSHOTS
 
 ---
 
