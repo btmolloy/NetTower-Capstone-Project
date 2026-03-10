@@ -1,6 +1,7 @@
-#Purpose: Collect user input (CLI for now), validate it using utils/net.py, and produce config overrides.
-#Inputs: CLI args / environment variables (and later UI settings).
-#Outputs: Parsed + validated values that feed into Config.
+# Purpose: Collect user input (CLI for now), validate it using utils/net.py,
+# and produce config overrides.
+# Inputs: CLI args / environment variables (and later UI settings).
+# Outputs: Parsed + validated values that feed into Config.
 
 from __future__ import annotations
 
@@ -11,6 +12,7 @@ from backEnd.utils.net import (
     is_valid_cidr,
     is_valid_interface,
     normalize_cidr,
+    detect_capture_interface,
 )
 from backEnd.utils.logging import get_logger
 
@@ -20,14 +22,14 @@ def load_config_from_cli() -> config:
     Build a config object using:
       - defaults
       - environment overrides (config.from_env)
-      - CLI overrides (this file)
+      - CLI overrides
     """
     base_cfg = config.from_env()
     log = get_logger("backEnd.settings", base_cfg.log_level, base_cfg.log_file)
 
     parser = argparse.ArgumentParser(prog="nettower", add_help=True)
 
-    parser.add_argument("--interface", dest="interface", help="capture interface (e.g. eth0)")
+    parser.add_argument("--interface", dest="interface", help="capture interface (e.g. eth0, en0, Ethernet, or auto)")
     parser.add_argument("--cidr", dest="discovery_target_cidr", help="discovery target CIDR (e.g. 192.168.1.0/24)")
     parser.add_argument("--interval", dest="discovery_interval_seconds", type=int, help="interval discovery seconds")
     parser.add_argument("--cooldown", dest="targeted_scan_cooldown_seconds", type=int, help="targeted scan cooldown seconds")
@@ -43,22 +45,18 @@ def load_config_from_cli() -> config:
     parser.add_argument("--disable-active", dest="enable_active_discovery", action="store_false")
     parser.set_defaults(enable_active_discovery=base_cfg.enable_active_discovery)
 
-    parser.add_argument("--enable-nmap", dest="enable_nmap", action="store_true")
-    parser.add_argument("--disable-nmap", dest="enable_nmap", action="store_false")
-    parser.set_defaults(enable_nmap=False)
-
-    parser.add_argument("--nmap-ports", dest="nmap_ports", default=None, help="ports list for nmap (e.g. 22,80,443)")
-
     args = parser.parse_args()
 
-    # Start with base env config, then override selectively
     cfg_dict = base_cfg.__dict__.copy()
 
     if args.interface:
         iface = args.interface.strip()
-        if not is_valid_interface(iface):
-            raise ValueError(f"invalid interface: {iface}")
-        cfg_dict["interface"] = iface
+        if iface.lower() == "auto":
+            cfg_dict["interface"] = detect_capture_interface()
+        else:
+            if not is_valid_interface(iface):
+                raise ValueError(f"invalid interface: {iface}")
+            cfg_dict["interface"] = iface
 
     if args.discovery_target_cidr:
         cidr = args.discovery_target_cidr.strip()
@@ -85,15 +83,13 @@ def load_config_from_cli() -> config:
     cfg_dict["enable_passive_listener"] = bool(args.enable_passive_listener)
     cfg_dict["enable_active_discovery"] = bool(args.enable_active_discovery)
 
-    # settings.py can attach extra fields for active discovery without forcing config changes yet
-    cfg_dict["enable_nmap"] = bool(args.enable_nmap)
-    if args.nmap_ports:
-        cfg_dict["nmap_ports"] = args.nmap_ports.strip()
+    final_cfg = config(**cfg_dict)
 
-    final_cfg = config(**cfg_dict)  # type: ignore[arg-type]
     log.info(
-        f"config loaded: iface={final_cfg.interface} cidr={final_cfg.discovery_target_cidr} "
-        f"interval={final_cfg.discovery_interval_seconds}s passive={final_cfg.enable_passive_listener} "
+        f"config loaded: iface={final_cfg.interface} "
+        f"cidr={final_cfg.discovery_target_cidr} "
+        f"interval={final_cfg.discovery_interval_seconds}s "
+        f"passive={final_cfg.enable_passive_listener} "
         f"active={final_cfg.enable_active_discovery}"
     )
 
