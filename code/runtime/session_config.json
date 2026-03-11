@@ -1,0 +1,8 @@
+{
+  "enable_passive_listener": true,
+  "enable_active_discovery": false,
+  "interface": "en0",
+  "discovery_target_cidr": null,
+  "discovery_interval_seconds": 120,
+  "targeted_scan_cooldown_seconds": 300
+}

@@ -54,19 +54,27 @@ class passive_listener(threading.Thread):
 
         self._proc: Optional[subprocess.Popen[str]] = None
         self._capture_backend: Optional[str] = None
+        self._last_stderr_line: Optional[str] = None
 
     def run(self) -> None:
         iface = getattr(self._cfg, "interface", None)
         bpf_filter = getattr(self._cfg, "passive_bpf_filter", "arp or ip")
 
         if not iface:
-            self._log.error("no capture interface resolved. passive listener disabled.")
+            self._log.error("No capture interface resolved. Passive listener disabled.")
             return
 
         cmd = self._build_capture_command(iface, bpf_filter)
         if not cmd:
-            self._log.error("no supported packet capture backend found (tcpdump/tshark). passive listener disabled.")
+            self._log.error(
+                "No supported packet capture backend found (tcpdump/tshark). Passive listener disabled."
+            )
             return
+
+        self._log.info(
+            f"Starting passive capture backend={self._capture_backend} iface={iface} "
+            f"filter='{bpf_filter}' cmd={cmd}"
+        )
 
         try:
             self._proc = subprocess.Popen(
@@ -77,21 +85,34 @@ class passive_listener(threading.Thread):
                 bufsize=1,
             )
         except Exception as exc:
-            self._log.error(f"failed to start passive capture backend: {exc}")
+            self._log.error(f"Failed to start passive capture backend: {exc}")
             return
+
+        stderr_thread = threading.Thread(
+            target=self._drain_stderr,
+            name="passive-listener-stderr",
+            daemon=True,
+        )
+        stderr_thread.start()
 
         self._log.info(
             f"passive listener started on iface={iface} "
             f"backend={self._capture_backend} filter='{bpf_filter}'"
         )
 
+        unexpected_exit = False
+        exit_code: int | None = None
+
         try:
             assert self._proc.stdout is not None
 
             while not self._stop_event.is_set():
                 line = self._proc.stdout.readline()
+
                 if not line:
                     if self._proc.poll() is not None:
+                        unexpected_exit = True
+                        exit_code = self._proc.poll()
                         break
                     continue
 
@@ -104,9 +125,28 @@ class passive_listener(threading.Thread):
                 elif self._capture_backend == "tshark":
                     self._handle_tshark_line(line, iface)
 
+        except Exception:
+            self._log.exception("Fatal error in passive listener loop")
         finally:
+            if unexpected_exit:
+                if self._last_stderr_line:
+                    self._log.error(
+                        f"Passive capture backend exited unexpectedly "
+                        f"(backend={self._capture_backend}, iface={iface}, exit_code={exit_code}). "
+                        f"Last stderr: {self._last_stderr_line}"
+                    )
+                else:
+                    self._log.error(
+                        f"Passive capture backend exited unexpectedly "
+                        f"(backend={self._capture_backend}, iface={iface}, exit_code={exit_code})."
+                    )
+
             self._shutdown_proc()
-            self._log.info("passive listener stopped")
+
+            if self._stop_event.is_set():
+                self._log.info("passive listener stopped")
+            else:
+                self._log.warning("passive listener stopped")
 
     def _build_capture_command(self, iface: str, bpf_filter: str) -> list[str] | None:
         """
@@ -134,11 +174,11 @@ class passive_listener(threading.Thread):
             self._capture_backend = "tshark"
             return [
                 tshark_path,
-                "-l",                   # line-buffered
-                "-n",                   # no name resolution
+                "-l",
+                "-n",
                 "-i", iface,
-                "-f", bpf_filter,       # capture filter (BPF-like)
-                "-Y", "arp or ip",      # display filter
+                "-f", bpf_filter,
+                "-Y", "arp or ip",
                 "-T", "fields",
                 "-E", "separator=|",
                 "-E", "occurrence=f",
@@ -155,6 +195,31 @@ class passive_listener(threading.Thread):
             ]
 
         return None
+
+    def _drain_stderr(self) -> None:
+        """
+        Drain stderr so the subprocess does not block and so we retain the
+        most recent useful error line for debugging.
+        """
+        if self._proc is None or self._proc.stderr is None:
+            return
+
+        try:
+            while True:
+                line = self._proc.stderr.readline()
+                if not line:
+                    if self._proc.poll() is not None:
+                        break
+                    continue
+
+                line = line.strip()
+                if not line:
+                    continue
+
+                self._last_stderr_line = line
+                self._log.warning(f"{self._capture_backend} stderr: {line}")
+        except Exception:
+            self._log.exception("Failed while reading passive capture stderr")
 
     def _handle_tcpdump_line(self, line: str, iface: str) -> None:
         # ARP -> host_seen
@@ -357,6 +422,10 @@ class passive_listener(threading.Thread):
                     self._proc.wait(timeout=1.5)
                 except Exception:
                     self._proc.kill()
+                    try:
+                        self._proc.wait(timeout=1.0)
+                    except Exception:
+                        pass
         except Exception:
             pass
         finally:

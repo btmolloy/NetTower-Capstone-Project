@@ -1,17 +1,22 @@
+# Purpose: Manage the lifecycle of the embedded MongoDB process used by NetTower.
+# Inputs: RuntimeConfig, RuntimePaths, and resolved mongod binary path.
+# Outputs: Running mongod process bound to the configured host/port.
+
 from __future__ import annotations
 
-import platform
 import shutil
 import socket
 import subprocess
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
+from backEnd.runtime.config import RuntimeConfig
+from backEnd.runtime.paths import RuntimePaths
 from backEnd.utils.logging import get_logger
 
 
-class mongo_runtime_manager:
+class MongoRuntimeManager:
     """
     Manages a local throwaway mongod process for NetTower.
 
@@ -21,32 +26,34 @@ class mongo_runtime_manager:
     - waits until the port is accepting connections
     - stops mongod on shutdown
     - optionally deletes the Mongo data directory on shutdown
-
-    mongod resolution order:
-    1. cfg.mongo_binary_path
-    2. bundled runtime binary shipped with NetTower
-    3. PATH lookup (shutil.which)
     """
 
-    def __init__(self, cfg: Any) -> None:
+    def __init__(
+        self,
+        cfg: RuntimeConfig,
+        paths: RuntimePaths,
+        mongod_binary: Path,
+    ) -> None:
         self._cfg = cfg
+        self._paths = paths
+        self._mongod_binary = mongod_binary
+
         self._log = get_logger(
-            "backEnd.storage.mongo_runtime",
-            getattr(cfg, "log_level", "INFO"),
-            getattr(cfg, "log_file", None),
+            "backEnd.runtime.mongo_runtime",
+            cfg.log_level,
+            cfg.log_file,
         )
+
         self._proc: Optional[subprocess.Popen[str]] = None
 
     def start(self) -> None:
         if self._proc is not None and self._proc.poll() is None:
             return
 
-        mongod_path = self._resolve_mongod_path()
+        data_dir = self._paths.mongo_data_dir
+        log_path = self._paths.mongo_log_path
 
-        data_dir = Path(self._cfg.mongo_data_dir).resolve()
-        log_path = Path(self._cfg.mongo_log_path).resolve() if self._cfg.mongo_log_path else None
-
-        if getattr(self._cfg, "mongo_reset_on_launch", True) and data_dir.exists():
+        if self._cfg.mongo_reset_on_launch and data_dir.exists():
             self._log.info(f"Removing previous Mongo data dir: {data_dir}")
             shutil.rmtree(data_dir, ignore_errors=True)
 
@@ -56,18 +63,24 @@ class mongo_runtime_manager:
             log_path.parent.mkdir(parents=True, exist_ok=True)
 
         cmd = [
-            mongod_path,
-            "--dbpath", str(data_dir),
-            "--bind_ip", str(self._cfg.mongo_host),
-            "--port", str(self._cfg.mongo_port),
+            str(self._mongod_binary),
+            "--dbpath",
+            str(data_dir),
+            "--bind_ip",
+            str(self._cfg.mongo_host),
+            "--port",
+            str(self._cfg.mongo_port),
         ]
 
         if log_path is not None:
             cmd.extend(["--logpath", str(log_path), "--logappend"])
 
         self._log.info(
-            f"Starting local mongod: host={self._cfg.mongo_host} "
-            f"port={self._cfg.mongo_port} dbpath={data_dir} binary={mongod_path}"
+            f"Starting local mongod: "
+            f"host={self._cfg.mongo_host} "
+            f"port={self._cfg.mongo_port} "
+            f"dbpath={data_dir} "
+            f"binary={self._mongod_binary}"
         )
 
         try:
@@ -106,69 +119,11 @@ class mongo_runtime_manager:
             except Exception:
                 pass
 
-        if getattr(self._cfg, "mongo_delete_on_shutdown", True):
-            data_dir = Path(self._cfg.mongo_data_dir).resolve()
+        if self._cfg.mongo_delete_on_shutdown:
+            data_dir = self._paths.mongo_data_dir
             if data_dir.exists():
                 self._log.info(f"Deleting Mongo data dir: {data_dir}")
                 shutil.rmtree(data_dir, ignore_errors=True)
-
-    def _resolve_mongod_path(self) -> str:
-        configured = getattr(self._cfg, "mongo_binary_path", None)
-        if configured:
-            configured_path = Path(configured).expanduser().resolve()
-            if configured_path.exists() and configured_path.is_file():
-                return str(configured_path)
-            raise RuntimeError(f"configured mongod binary not found: {configured_path}")
-
-        bundled = self._get_bundled_mongod_path()
-        if bundled is not None:
-            return bundled
-
-        discovered = shutil.which("mongod")
-        if discovered:
-            return discovered
-
-        raise RuntimeError(
-            "mongod not found. Set NETTOWER_MONGO_BINARY_PATH, bundle mongod with the app, or install MongoDB."
-        )
-
-    def _get_bundled_mongod_path(self) -> str | None:
-        """
-        Look for a NetTower-bundled mongod binary relative to the project/app root.
-
-        Expected layout:
-            code/
-              runtime_binaries/
-                windows/mongod.exe
-                linux/mongod
-                macos/mongod
-        """
-        project_root = self._get_project_root()
-        system = platform.system().lower()
-
-        if system == "windows":
-            candidate = project_root / "runtime_binaries" / "windows" / "mongod.exe"
-        elif system == "darwin":
-            candidate = project_root / "runtime_binaries" / "macos" / "mongod"
-        else:
-            candidate = project_root / "runtime_binaries" / "linux" / "mongod"
-
-        if candidate.exists() and candidate.is_file():
-            return str(candidate.resolve())
-
-        return None
-
-    def _get_project_root(self) -> Path:
-        """
-        Resolve the NetTower code/ directory from this file location.
-
-        Current file:
-            code/backEnd/storage/mongo_runtime.py
-
-        Project root returned:
-            code/
-        """
-        return Path(__file__).resolve().parents[2]
 
     def _wait_until_ready(self, host: str, port: int, timeout_seconds: int) -> None:
         deadline = time.time() + max(1, timeout_seconds)

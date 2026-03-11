@@ -29,6 +29,7 @@ class mongo_client_manager:
         Connect to Mongo and ensure indexes exist.
         Safe to call multiple times; returns cached handles.
         """
+
         if self._handles is not None:
             return self._handles
 
@@ -39,24 +40,30 @@ class mongo_client_manager:
                 "pymongo is required for MongoDB storage. Install with: pip install pymongo"
             ) from exc
 
-        client = MongoClient(self._cfg.mongo_uri)
-        db = client[self._cfg.mongo_db_name]
+        # ---------------------------------------------------------
+        # Resolve Mongo connection settings
+        # ---------------------------------------------------------
+
+        mongo_uri = getattr(self._cfg, "mongo_uri", "mongodb://127.0.0.1:27017")
+        mongo_db_name = getattr(self._cfg, "mongo_db_name", "nettower")
+
+        client = MongoClient(mongo_uri)
+        db = client[mongo_db_name]
 
         hosts = db["hosts"]
         edges = db["edges"]
 
-        # ---- Indexes (minimal but critical) ----
-        # Hosts:
-        #   - host_id unique (stable primary key)
-        #   - macs and ips for correlation lookups
+        # ---------------------------------------------------------
+        # Index setup
+        # ---------------------------------------------------------
+
+        # Hosts
         hosts.create_index("host_id", unique=True)
         hosts.create_index("macs")
         hosts.create_index("ips")
         hosts.create_index("last_seen")
 
-        # Edges:
-        #   - edge_key unique (stable pair+proto key)
-        #   - host ids for querying adjacency
+        # Edges
         edges.create_index("edge_key", unique=True)
         edges.create_index([("a_host_id", 1), ("b_host_id", 1), ("proto", 1)])
         edges.create_index("last_seen")
@@ -67,6 +74,7 @@ class mongo_client_manager:
             hosts=hosts,
             edges=edges,
         )
+
         return self._handles
 
     def handles(self) -> mongo_handles:
@@ -79,6 +87,7 @@ class mongo_client_manager:
         """
         Close Mongo client if open.
         """
+
         if self._handles is None:
             return
 
