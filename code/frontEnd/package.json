@@ -1,0 +1,14 @@
+{
+  "name": "nettower-electron-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron runtime control frontend for NetTower",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^37.0.0"
+  }
+}

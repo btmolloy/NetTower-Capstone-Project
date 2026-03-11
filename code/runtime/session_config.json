@@ -2,7 +2,7 @@
   "enable_passive_listener": true,
   "enable_active_discovery": false,
   "interface": "en0",
-  "discovery_target_cidr": null,
+  "discovery_target_cidr": "10.10.30.0/24",
   "discovery_interval_seconds": 120,
   "targeted_scan_cooldown_seconds": 300
 }

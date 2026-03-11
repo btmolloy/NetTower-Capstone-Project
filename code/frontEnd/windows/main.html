@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NetTower Session</title>
+  <link rel="stylesheet" href="../css/styles.css" />
+</head>
+<body class="screen screen-main">
+  <main class="topology-shell">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1>NetTower Session Running</h1>
+        <p id="live-caption">Polling topology snapshot from runtime database.</p>
+      </div>
+      <div class="topbar-actions">
+        <button id="settings-btn" class="button-secondary" type="button">Settings</button>
+        <button id="map-mode-btn" class="button-secondary" type="button">Map: 2D</button>
+        <button id="stop-session-btn" class="button-danger" type="button">Stop Session</button>
+      </div>
+    </header>
+
+    <section class="workspace">
+      <div class="topology-stage">
+        <canvas id="topology-canvas"></canvas>
+        <div id="canvas-empty" class="canvas-empty">
+          No hosts discovered yet. Waiting for events...
+        </div>
+        <div class="legend-card">
+          <h2>Activity Heat</h2>
+          <p>Node color reflects recency of communication.</p>
+          <div class="legend-scale">
+            <span class="legend-dot legend-hot"></span><span>Active (0-30s)</span>
+            <span class="legend-dot legend-warm"></span><span>Warm (30-120s)</span>
+            <span class="legend-dot legend-cold"></span><span>Cold (120s+)</span>
+          </div>
+        </div>
+      </div>
+
+      <aside id="host-drawer" class="host-drawer">
+        <header class="drawer-header">
+          <h2>Host Details</h2>
+          <button id="close-drawer-btn" class="icon-button" type="button" aria-label="Close host details">
+            ×
+          </button>
+        </header>
+        <div id="host-details" class="host-details">
+          Select a host node to inspect metadata.
+        </div>
+      </aside>
+    </section>
+
+    <footer class="status-bar">
+      <p id="main-status" class="status-chip status-info">Session is running.</p>
+      <p id="counts-status" class="status-chip">Hosts: 0 | Edges: 0</p>
+      <p id="updated-status" class="status-chip">Last update: --</p>
+    </footer>
+  </main>
+
+  <aside id="settings-drawer" class="settings-drawer">
+    <header class="drawer-header">
+      <h2>Display Settings</h2>
+      <button id="close-settings-btn" class="icon-button" type="button" aria-label="Close settings">
+        ×
+      </button>
+    </header>
+    <form id="settings-form" class="settings-form">
+      <label class="field">
+        <span>Refresh interval (ms)</span>
+        <input id="refresh-interval-input" type="number" min="500" step="100" value="3000" />
+      </label>
+      <label class="field">
+        <span>Host render limit</span>
+        <input id="host-limit-input" type="number" min="10" max="2000" value="250" />
+      </label>
+      <label class="field">
+        <span>Edge render limit</span>
+        <input id="edge-limit-input" type="number" min="10" max="4000" value="500" />
+      </label>
+      <button id="apply-settings-btn" class="button-primary" type="submit">Apply Settings</button>
+    </form>
+  </aside>
+
+  <div id="drawer-backdrop" class="drawer-backdrop"></div>
+
+  <script src="../js/main_controller.js"></script>
+</body>
+</html>
