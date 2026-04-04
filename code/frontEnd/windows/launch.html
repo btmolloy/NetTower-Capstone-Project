@@ -4,19 +4,32 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NetTower</title>
+  <link rel="icon" type="image/png" href="../NetTowerIcon-square.png" />
   <link rel="stylesheet" href="../css/styles.css" />
 </head>
 <body class="screen screen-launch">
   <main class="panel">
     <header class="panel-header">
-      <h1>NetTower</h1>
-      <p>Configure the scan session and start runtime services.</p>
+      <div class="brand-block">
+        <img src="../NetTowerIcon-square.png" alt="NetTower icon" class="brand-logo" />
+        <div>
+          <h1>NetTower</h1>
+          <p>Configure the scan session and start runtime services.</p>
+        </div>
+      </div>
     </header>
 
     <form id="session-config-form" class="form-grid">
       <label class="field">
         <span>Interface</span>
-        <input id="interface" name="interface" type="text" placeholder="en0" />
+        <input
+          id="interface"
+          name="interface"
+          type="text"
+          placeholder="en0"
+          pattern="[A-Za-z0-9._:-]+"
+          required
+        />
       </label>
 
       <label class="field">
@@ -26,6 +39,7 @@
           name="discovery_target_cidr"
           type="text"
           placeholder="192.168.1.0/24"
+          required
         />
       </label>
 
@@ -56,6 +70,7 @@
           type="number"
           min="1"
           value="120"
+          step="1"
           required
         />
       </label>
@@ -68,6 +83,7 @@
           type="number"
           min="0"
           value="300"
+          step="1"
           required
         />
       </label>

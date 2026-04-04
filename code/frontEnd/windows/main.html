@@ -4,18 +4,24 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NetTower Session</title>
+  <link rel="icon" type="image/png" href="../NetTowerIcon-square.png" />
   <link rel="stylesheet" href="../css/styles.css" />
 </head>
 <body class="screen screen-main">
   <main class="topology-shell">
     <header class="topbar">
       <div class="topbar-left">
-        <h1>NetTower Session Running</h1>
-        <p id="live-caption">Polling topology snapshot from runtime database.</p>
+        <div class="brand-block brand-block-compact">
+          <img src="../NetTowerIcon-square.png" alt="NetTower icon" class="brand-logo brand-logo-small" />
+          <div>
+            <h1>NetTower Session Running</h1>
+            <p id="live-caption">Polling topology snapshot from runtime database.</p>
+          </div>
+        </div>
       </div>
       <div class="topbar-actions">
         <button id="settings-btn" class="button-secondary" type="button">Settings</button>
-        <button id="map-mode-btn" class="button-secondary" type="button">Map: 2D</button>
+        <button id="map-mode-btn" class="button-secondary" type="button">Mode: 2D</button>
         <button id="stop-session-btn" class="button-danger" type="button">Stop Session</button>
       </div>
     </header>

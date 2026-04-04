@@ -1,7 +1,7 @@
 const canvas = document.getElementById("topology-canvas");
 const canvasEmpty = document.getElementById("canvas-empty");
 const stopButton = document.getElementById("stop-session-btn");
-const mapModeButton = document.getElementById("map-mode-btn");
+const modeButton = document.getElementById("map-mode-btn");
 const settingsButton = document.getElementById("settings-btn");
 const mainStatusElement = document.getElementById("main-status");
 const countsStatusElement = document.getElementById("counts-status");
@@ -21,12 +21,17 @@ const edgeLimitInput = document.getElementById("edge-limit-input");
 const drawerBackdrop = document.getElementById("drawer-backdrop");
 
 const ctx = canvas.getContext("2d");
+const MODE_ORDER = ["2d", "3d", "idle"];
+const MODE_LABELS = {
+  "2d": "2D",
+  "3d": "3D",
+  idle: "Idle",
+};
 
 const state = {
   mode: "2d",
   nodes: new Map(),
   edges: [],
-  visibleNodeIds: new Set(),
   hitRegions: [],
   selectedHostId: null,
   selectedHost: null,
@@ -35,10 +40,25 @@ const state = {
   edgeLimit: 500,
   pollingTimer: null,
   fetchInFlight: false,
-  cameraAngle: 0,
   animationHandle: null,
   width: 1,
   height: 1,
+  idleAngle: 0,
+  camera: {
+    yaw: -0.58,
+    pitch: 0.96,
+    distance: 900,
+    focalLength: 780,
+    panX: 0,
+    panZ: 0,
+    dragging: false,
+    dragMode: null,
+    dragDistance: 0,
+    pointerId: null,
+    lastX: 0,
+    lastY: 0,
+    lastDragAt: 0,
+  },
 };
 
 const resizeObserver = new ResizeObserver(() => {
@@ -78,23 +98,23 @@ function ageSeconds(value) {
 function hostRecencyColor(lastSeen) {
   const age = ageSeconds(lastSeen);
   if (age <= 30) {
-    return "#1ad47a";
+    return "#35d38c";
   }
   if (age <= 120) {
-    return "#ffb24d";
+    return "#d9953f";
   }
-  return "#f36365";
+  return "#bb3f5f";
 }
 
 function edgeColor(lastSeen) {
   const age = ageSeconds(lastSeen);
   if (age <= 30) {
-    return "rgba(30, 215, 138, 0.48)";
+    return "rgba(52, 208, 139, 0.48)";
   }
   if (age <= 120) {
-    return "rgba(255, 172, 77, 0.35)";
+    return "rgba(220, 153, 74, 0.34)";
   }
-  return "rgba(228, 117, 122, 0.24)";
+  return "rgba(182, 70, 98, 0.26)";
 }
 
 function setStatus(message, level = "info") {
@@ -108,8 +128,19 @@ function setStopping(isStopping) {
   stopButton.textContent = isStopping ? "Stopping Session..." : "Stop Session";
 }
 
-function updateMapModeLabel() {
-  mapModeButton.textContent = `Map: ${state.mode === "2d" ? "2D" : "3D"}`;
+function modeCaption() {
+  if (state.mode === "2d") {
+    return "2D mode shows active topology layout optimized for analysis.";
+  }
+  if (state.mode === "3d") {
+    return "3D mode: drag to orbit, Shift-drag or right-drag to pan, scroll to zoom.";
+  }
+  return "Idle mode: cinematic rotation for passive wallboard monitoring.";
+}
+
+function updateModeLabel() {
+  modeButton.textContent = `Mode: ${MODE_LABELS[state.mode]}`;
+  liveCaptionElement.textContent = modeCaption();
 }
 
 function updateBackdrop() {
@@ -211,7 +242,7 @@ function ensureNode(host) {
       host,
       x: randomRange(80, Math.max(120, state.width - 80)),
       y: randomRange(80, Math.max(120, state.height - 80)),
-      z: randomRange(-1, 1),
+      z: randomRange(-1.2, 1.2),
       vx: randomRange(-0.25, 0.25),
       vy: randomRange(-0.25, 0.25),
       vz: randomRange(-0.003, 0.003),
@@ -257,7 +288,6 @@ function applySnapshot(snapshot) {
 
   const validHosts = hosts.filter((host) => host.host_id);
   const visibleNodeIds = new Set(validHosts.map((host) => host.host_id));
-  state.visibleNodeIds = visibleNodeIds;
 
   for (const host of validHosts) {
     ensureNode(host);
@@ -286,9 +316,7 @@ function applySnapshot(snapshot) {
   state.edges = validEdges;
 
   if (state.selectedHostId && state.nodes.has(state.selectedHostId)) {
-    const host = state.nodes.get(state.selectedHostId).host;
-    state.selectedHost = host;
-    renderHostDetails(host);
+    renderHostDetails(state.nodes.get(state.selectedHostId).host);
   } else if (state.selectedHostId) {
     closeHostDrawer();
   }
@@ -296,33 +324,31 @@ function applySnapshot(snapshot) {
   const lastUpdate = snapshot.captured_at ? new Date(snapshot.captured_at).toLocaleTimeString() : "--";
   countsStatusElement.textContent = `Hosts: ${validHosts.length} | Edges: ${validEdges.length}`;
   updatedStatusElement.textContent = `Last update: ${lastUpdate}`;
-
-  const hasData = validHosts.length > 0;
-  canvasEmpty.classList.toggle("is-hidden", hasData);
+  canvasEmpty.classList.toggle("is-hidden", validHosts.length > 0);
 }
 
-function projectNode(node) {
-  if (state.mode === "2d") {
-    return {
-      x: node.x,
-      y: node.y,
-      scale: 1,
-      depth: 0,
-    };
-  }
+function drawBackground() {
+  const gradient = ctx.createLinearGradient(0, 0, state.width, state.height);
+  gradient.addColorStop(0, "#090c12");
+  gradient.addColorStop(0.55, "#131924");
+  gradient.addColorStop(1, "#1b1318");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, state.width, state.height);
+}
 
+function projectIdleNode(node) {
   const cx = state.width / 2;
   const cy = state.height / 2;
   const worldX = node.x - cx;
   const worldY = node.y - cy;
   const worldZ = node.z * 180;
 
-  const c = Math.cos(state.cameraAngle);
-  const s = Math.sin(state.cameraAngle);
+  const c = Math.cos(state.idleAngle);
+  const s = Math.sin(state.idleAngle);
 
   const rx = worldX * c + worldZ * s;
   const rz = worldZ * c - worldX * s;
-  const perspective = clamp(1 + rz / 720, 0.52, 1.75);
+  const perspective = clamp(1 + rz / 700, 0.5, 1.8);
 
   return {
     x: cx + rx * perspective,
@@ -332,36 +358,333 @@ function projectNode(node) {
   };
 }
 
-function drawBackground() {
-  const gradient = ctx.createLinearGradient(0, 0, state.width, state.height);
-  gradient.addColorStop(0, "#0d2238");
-  gradient.addColorStop(1, "#112f4a");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, state.width, state.height);
+function nodeWorldPosition(node) {
+  const cx = state.width / 2;
+  const cy = state.height / 2;
+  const x = (node.x - cx) * 1.18;
+  const z = (node.y - cy) * 1.18;
+  const recentBoost = Math.max(0, 110 - ageSeconds(node.host.last_seen)) * 0.08;
+  const y = 16 + Math.min(80, node.degree * 4.8) + recentBoost;
+  return { x, y, z };
 }
 
-function drawTopology() {
-  drawBackground();
+function worldToCameraPoint(point) {
+  const {
+    yaw,
+    pitch,
+    panX,
+    panZ,
+  } = state.camera;
+  const cy = Math.cos(yaw);
+  const sy = Math.sin(yaw);
 
-  const projections = new Map();
-  state.hitRegions = [];
+  const shiftedX = point.x - panX;
+  const shiftedZ = point.z - panZ;
 
-  for (const [hostId, node] of state.nodes.entries()) {
-    projections.set(hostId, projectNode(node));
+  let x = shiftedX * cy - shiftedZ * sy;
+  let z = shiftedX * sy + shiftedZ * cy;
+  let y = point.y;
+
+  const cp = Math.cos(pitch);
+  const sp = Math.sin(pitch);
+
+  // Rotate world for an above-looking camera pitch so 3D starts in a top-down perspective.
+  const y2 = y * cp + z * sp;
+  const z2 = -y * sp + z * cp;
+
+  return {
+    x,
+    y: y2,
+    z: z2,
+  };
+}
+
+function cameraToScreenPoint(cameraPoint) {
+  const {
+    distance,
+    focalLength,
+  } = state.camera;
+
+  const depth = cameraPoint.z + distance;
+  if (depth <= 1) {
+    return null;
   }
+
+  const scale = focalLength / depth;
+  return {
+    x: state.width / 2 + cameraPoint.x * scale,
+    y: state.height * 0.72 - cameraPoint.y * scale,
+    scale,
+    depth,
+  };
+}
+
+function project3DPoint(point, nearDepth = 50) {
+  const cameraPoint = worldToCameraPoint(point);
+  const projected = cameraToScreenPoint(cameraPoint);
+  if (!projected || projected.depth <= nearDepth) {
+    return null;
+  }
+  return projected;
+}
+
+function panCameraByPixels(dx, dy) {
+  const scale = (state.camera.distance / state.camera.focalLength) * 1.55;
+  const cy = Math.cos(state.camera.yaw);
+  const sy = Math.sin(state.camera.yaw);
+
+  // Horizontal drag moves along camera-right; vertical drag moves along camera-forward on ground plane.
+  const rightX = cy;
+  const rightZ = sy;
+  const forwardX = -sy;
+  const forwardZ = cy;
+
+  state.camera.panX -= dx * scale * rightX;
+  state.camera.panZ -= dx * scale * rightZ;
+  state.camera.panX += dy * scale * forwardX;
+  state.camera.panZ += dy * scale * forwardZ;
+
+  state.camera.panX = clamp(state.camera.panX, -3800, 3800);
+  state.camera.panZ = clamp(state.camera.panZ, -3800, 3800);
+}
+
+function hexToRgb(hex) {
+  const normalized = hex.replace("#", "");
+  const parsed = Number.parseInt(normalized, 16);
+  return {
+    r: (parsed >> 16) & 255,
+    g: (parsed >> 8) & 255,
+    b: parsed & 255,
+  };
+}
+
+function shadeHex(hex, amount) {
+  const rgb = hexToRgb(hex);
+  const r = clamp(rgb.r + amount, 0, 255);
+  const g = clamp(rgb.g + amount, 0, 255);
+  const b = clamp(rgb.b + amount, 0, 255);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function drawWireframeGrid() {
+  const step = 120;
+  const halfSpan = Math.ceil(
+    Math.max(2600, Math.max(state.width, state.height) * 3.6) / step,
+  ) * step;
+  const centerX = Math.round(state.camera.panX / step) * step;
+  const centerZ = Math.round(state.camera.panZ / step) * step;
+  const minX = centerX - halfSpan;
+  const maxX = centerX + halfSpan;
+  const minZ = centerZ - halfSpan;
+  const maxZ = centerZ + halfSpan;
+  const majorEvery = step * 4;
+  const y = 0;
+  const nearDepth = 28;
+
+  const drawGridSegment = (
+    startWorld,
+    endWorld,
+    isMajor,
+    majorColor,
+    minorColor,
+  ) => {
+    let cameraA = worldToCameraPoint(startWorld);
+    let cameraB = worldToCameraPoint(endWorld);
+
+    let depthA = cameraA.z + state.camera.distance;
+    let depthB = cameraB.z + state.camera.distance;
+
+    if (depthA <= nearDepth && depthB <= nearDepth) {
+      return;
+    }
+
+    // Clip segments to near plane so close grid lines never disappear.
+    if (depthA <= nearDepth || depthB <= nearDepth) {
+      const t = (nearDepth - depthA) / (depthB - depthA);
+      const clipped = {
+        x: cameraA.x + (cameraB.x - cameraA.x) * t,
+        y: cameraA.y + (cameraB.y - cameraA.y) * t,
+        z: cameraA.z + (cameraB.z - cameraA.z) * t,
+      };
+      if (depthA <= nearDepth) {
+        cameraA = clipped;
+        depthA = nearDepth;
+      } else {
+        cameraB = clipped;
+        depthB = nearDepth;
+      }
+    }
+
+    const start = cameraToScreenPoint(cameraA);
+    const end = cameraToScreenPoint(cameraB);
+    if (!start || !end) {
+      return;
+    }
+
+    const closestDepth = Math.min(start.depth, end.depth);
+    const depthBoost = 1 - closestDepth / (state.camera.distance + halfSpan);
+    const alpha = isMajor
+      ? clamp(0.46 + depthBoost * 0.26, 0.34, 0.78)
+      : clamp(0.24 + depthBoost * 0.2, 0.18, 0.56);
+    ctx.strokeStyle = `${isMajor ? majorColor : minorColor}${alpha})`;
+    ctx.lineWidth = isMajor ? 1.55 : 1.06;
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.stroke();
+  };
 
   ctx.save();
   ctx.lineCap = "round";
 
+  for (let x = minX; x <= maxX; x += step) {
+    const isMajor = Math.abs(x / majorEvery - Math.round(x / majorEvery)) < 1e-6;
+    drawGridSegment(
+      { x, y, z: minZ },
+      { x, y, z: maxZ },
+      isMajor,
+      "rgba(222, 104, 136, ",
+      "rgba(178, 62, 92, ",
+    );
+  }
+
+  for (let z = minZ; z <= maxZ; z += step) {
+    const isMajor = Math.abs(z / majorEvery - Math.round(z / majorEvery)) < 1e-6;
+    drawGridSegment(
+      { x: minX, y, z },
+      { x: maxX, y, z },
+      isMajor,
+      "rgba(198, 88, 118, ",
+      "rgba(144, 52, 76, ",
+    );
+  }
+  ctx.restore();
+}
+
+function drawCube(world, size, height, baseColor, selected) {
+  const half = size / 2;
+  const vertices = [
+    { x: -half, y: 0, z: -half },
+    { x: half, y: 0, z: -half },
+    { x: half, y: 0, z: half },
+    { x: -half, y: 0, z: half },
+    { x: -half, y: height, z: -half },
+    { x: half, y: height, z: -half },
+    { x: half, y: height, z: half },
+    { x: -half, y: height, z: half },
+  ];
+
+  const projected = vertices.map((vertex) => project3DPoint({
+    x: world.x + vertex.x,
+    y: world.y + vertex.y,
+    z: world.z + vertex.z,
+  }));
+  if (projected.some((point) => point === null)) {
+    return null;
+  }
+
+  const p = projected;
+  const drawFace = (indices, fillStyle, strokeStyle = null) => {
+    ctx.fillStyle = fillStyle;
+    ctx.beginPath();
+    ctx.moveTo(p[indices[0]].x, p[indices[0]].y);
+    for (let i = 1; i < indices.length; i += 1) {
+      ctx.lineTo(p[indices[i]].x, p[indices[i]].y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    if (strokeStyle) {
+      ctx.strokeStyle = strokeStyle;
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+  };
+
+  const faces = [
+    { indices: [4, 5, 6, 7], color: shadeHex(baseColor, 30) },  // top
+    { indices: [0, 1, 5, 4], color: shadeHex(baseColor, -7) },  // front
+    { indices: [1, 2, 6, 5], color: shadeHex(baseColor, -14) }, // right
+    { indices: [2, 3, 7, 6], color: shadeHex(baseColor, -22) }, // back
+    { indices: [3, 0, 4, 7], color: shadeHex(baseColor, -12) }, // left
+  ].map((face) => ({
+    ...face,
+    avgDepth: face.indices.reduce((sum, idx) => sum + p[idx].depth, 0) / face.indices.length,
+  }));
+
+  // Draw far faces first so near faces properly overlap.
+  faces.sort((a, b) => b.avgDepth - a.avgDepth);
+  for (const face of faces) {
+    drawFace(face.indices, face.color, "rgba(22, 12, 17, 0.55)");
+  }
+
+  ctx.strokeStyle = "rgba(12, 6, 10, 0.72)";
+  ctx.lineWidth = 1.02;
+  const edges = [
+    [0, 1], [1, 2], [2, 3], [3, 0],
+    [4, 5], [5, 6], [6, 7], [7, 4],
+    [4, 0], [5, 1], [6, 2], [7, 3],
+  ];
+  for (const [a, b] of edges) {
+    ctx.beginPath();
+    ctx.moveTo(p[a].x, p[a].y);
+    ctx.lineTo(p[b].x, p[b].y);
+    ctx.stroke();
+  }
+
+  const topCenter = project3DPoint({
+    x: world.x,
+    y: world.y + height,
+    z: world.z,
+  });
+  if (!topCenter) {
+    return null;
+  }
+
+  // Subtle crown lines to read more like a compact tower than a flat box.
+  const crownInset = clamp(size * topCenter.scale * 0.24, 2.2, 5.5);
+  ctx.strokeStyle = "rgba(243, 222, 230, 0.6)";
+  ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(p[4].x + crownInset, p[4].y + crownInset);
+  ctx.lineTo(p[5].x - crownInset, p[5].y + crownInset);
+  ctx.lineTo(p[6].x - crownInset, p[6].y - crownInset);
+  ctx.lineTo(p[7].x + crownInset, p[7].y - crownInset);
+  ctx.closePath();
+  ctx.stroke();
+
+  if (selected) {
+    ctx.strokeStyle = "rgba(244, 232, 236, 0.95)";
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(topCenter.x, topCenter.y, Math.max(10, size * topCenter.scale * 0.95), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  return {
+    x: topCenter.x,
+    y: topCenter.y,
+    radius: Math.max(10, size * topCenter.scale * 1.1),
+    depth: topCenter.depth,
+  };
+}
+
+function drawNodesAndEdges2D(projectionForNode) {
+  const projections = new Map();
+  state.hitRegions = [];
+  for (const [hostId, node] of state.nodes.entries()) {
+    projections.set(hostId, projectionForNode(node));
+  }
+
+  ctx.save();
+  ctx.lineCap = "round";
   for (const edge of state.edges) {
     const a = projections.get(edge.a_host_id);
     const b = projections.get(edge.b_host_id);
     if (!a || !b) {
       continue;
     }
-    const edgeAgeColor = edgeColor(edge.last_seen);
-    ctx.strokeStyle = edgeAgeColor;
-    ctx.lineWidth = clamp(((a.scale + b.scale) / 2) * 1.8, 0.75, 3.2);
+    ctx.strokeStyle = edgeColor(edge.last_seen);
+    ctx.lineWidth = clamp(((a.scale + b.scale) / 2) * 1.8, 0.8, 3.4);
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
@@ -383,43 +706,143 @@ function drawTopology() {
     const radius = node.radius * projected.scale;
     const x = projected.x;
     const y = projected.y;
-
-    const fill = hostRecencyColor(node.host.last_seen);
     const selected = state.selectedHostId === node.host.host_id;
 
     ctx.beginPath();
-    ctx.fillStyle = "rgba(8, 16, 24, 0.35)";
-    ctx.arc(x + 2, y + 3, radius + 0.8, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(5, 7, 11, 0.45)";
+    ctx.arc(x + 2, y + 2, radius + 0.7, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.beginPath();
-    ctx.fillStyle = fill;
+    ctx.fillStyle = hostRecencyColor(node.host.last_seen);
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
 
     if (selected) {
       ctx.beginPath();
-      ctx.strokeStyle = "rgba(255,255,255,0.95)";
-      ctx.lineWidth = 2.2;
+      ctx.strokeStyle = "rgba(242, 232, 236, 0.95)";
+      ctx.lineWidth = 2.1;
       ctx.arc(x, y, radius + 4, 0, Math.PI * 2);
       ctx.stroke();
     }
 
-    const label = nodeLabel(node.host);
-    ctx.fillStyle = "rgba(235, 246, 255, 0.9)";
+    ctx.fillStyle = "rgba(236, 242, 250, 0.92)";
     ctx.font = `${Math.max(10, Math.round(11 * projected.scale))}px "Avenir Next", sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
-    ctx.fillText(label, x, y - radius - 6);
+    ctx.fillText(nodeLabel(node.host), x, y - radius - 6);
 
     state.hitRegions.push({
       hostId: node.host.host_id,
       x,
       y,
-      radius: radius + 8,
+      radius: radius + 9,
     });
   }
   ctx.restore();
+}
+
+function drawMode2D() {
+  drawNodesAndEdges2D((node) => ({
+    x: node.x,
+    y: node.y,
+    scale: 1,
+    depth: 0,
+  }));
+}
+
+function drawModeIdle() {
+  drawNodesAndEdges2D((node) => projectIdleNode(node));
+}
+
+function drawMode3D() {
+  state.hitRegions = [];
+  drawWireframeGrid();
+
+  const nodeData = [];
+  for (const node of state.nodes.values()) {
+    const world = nodeWorldPosition(node);
+    nodeData.push({
+      node,
+      world,
+      size: clamp(16 + node.degree * 1.8, 16, 38),
+      height: clamp(16 + node.degree * 3.8, 18, 74),
+      depth: world.z,
+    });
+  }
+  const nodeDataById = new Map(
+    nodeData.map((entry) => [entry.node.host.host_id, entry]),
+  );
+
+  ctx.save();
+  ctx.lineCap = "round";
+  for (const edge of state.edges) {
+    const aNode = nodeDataById.get(edge.a_host_id);
+    const bNode = nodeDataById.get(edge.b_host_id);
+    if (!aNode || !bNode) {
+      continue;
+    }
+
+    const aProjected = project3DPoint({
+      x: aNode.world.x,
+      y: aNode.world.y + aNode.height,
+      z: aNode.world.z,
+    });
+    const bProjected = project3DPoint({
+      x: bNode.world.x,
+      y: bNode.world.y + bNode.height,
+      z: bNode.world.z,
+    });
+    if (!aProjected || !bProjected) {
+      continue;
+    }
+
+    ctx.strokeStyle = edgeColor(edge.last_seen);
+    ctx.lineWidth = clamp(((aProjected.scale + bProjected.scale) / 2) * 3.2, 1.0, 4.0);
+    ctx.beginPath();
+    ctx.moveTo(aProjected.x, aProjected.y);
+    ctx.lineTo(bProjected.x, bProjected.y);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  const sorted = nodeData.sort((left, right) => left.world.z - right.world.z);
+  for (const entry of sorted) {
+    const base = hostRecencyColor(entry.node.host.last_seen);
+    const selected = state.selectedHostId === entry.node.host.host_id;
+    const hit = drawCube(entry.world, entry.size, entry.height, base, selected);
+    if (!hit) {
+      continue;
+    }
+
+    ctx.fillStyle = "rgba(236, 242, 250, 0.94)";
+    ctx.font = `${Math.max(10, Math.round(11 * hit.radius * 0.08))}px "Avenir Next", sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    ctx.fillText(nodeLabel(entry.node.host), hit.x, hit.y - hit.radius - 4);
+
+    state.hitRegions.push({
+      hostId: entry.node.host.host_id,
+      x: hit.x,
+      y: hit.y,
+      radius: hit.radius,
+      depth: hit.depth,
+    });
+  }
+}
+
+function drawTopology() {
+  drawBackground();
+
+  if (state.mode === "2d") {
+    drawMode2D();
+    return;
+  }
+  if (state.mode === "3d") {
+    drawMode3D();
+    return;
+  }
+  drawModeIdle();
 }
 
 function stepPhysics() {
@@ -432,10 +855,10 @@ function stepPhysics() {
   const height = state.height;
   const centerX = width / 2;
   const centerY = height / 2;
-  const repulsion = state.mode === "3d" ? 2800 : 1900;
-  const springStrength = 0.0045;
+  const repulsion = state.mode === "idle" ? 2600 : 1900;
+  const springStrength = 0.0048;
   const damping = 0.88;
-  const attraction = 0.0016;
+  const attraction = 0.0017;
   const idealEdgeLength = clamp(
     Math.sqrt((width * height) / Math.max(nodes.length, 1)) * 0.85,
     70,
@@ -501,7 +924,7 @@ function stepPhysics() {
       node.y = clamp(node.y, edgeMargin, height - edgeMargin);
     }
 
-    if (state.mode === "3d") {
+    if (state.mode === "idle") {
       node.vz += (-node.z) * 0.0035 + randomRange(-0.0006, 0.0006);
       node.vz *= 0.95;
       node.z = clamp(node.z + node.vz, -1.5, 1.5);
@@ -514,8 +937,8 @@ function stepPhysics() {
 
 function animationLoop() {
   stepPhysics();
-  if (state.mode === "3d") {
-    state.cameraAngle += 0.0035;
+  if (state.mode === "idle") {
+    state.idleAngle += 0.0034;
   }
   drawTopology();
   state.animationHandle = window.requestAnimationFrame(animationLoop);
@@ -551,14 +974,11 @@ async function pollTopology() {
 
     if (snapshot.warning) {
       setStatus(`Topology warning: ${snapshot.warning}`, "error");
-      liveCaptionElement.textContent = "Waiting for topology data stream.";
     } else {
       setStatus("Session is running.", "info");
-      liveCaptionElement.textContent = "Topology map updates every few seconds from Mongo.";
     }
   } catch (error) {
     setStatus(`Topology poll failed: ${error.message}`, "error");
-    liveCaptionElement.textContent = "Unable to refresh topology snapshot.";
   } finally {
     state.fetchInFlight = false;
   }
@@ -573,15 +993,15 @@ function restartPolling() {
   state.pollingTimer = setInterval(pollTopology, state.refreshIntervalMs);
 }
 
-canvas.addEventListener("click", (event) => {
-  const rect = canvas.getBoundingClientRect();
-  const x = event.clientX - rect.left;
-  const y = event.clientY - rect.top;
-
+function pickHitNode(x, y) {
   let nearest = null;
   let nearestDistance = Number.POSITIVE_INFINITY;
 
-  for (const region of state.hitRegions) {
+  const orderedRegions = state.hitRegions
+    .slice()
+    .sort((left, right) => (right.depth || 0) - (left.depth || 0));
+
+  for (const region of orderedRegions) {
     const dx = x - region.x;
     const dy = y - region.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -591,17 +1011,141 @@ canvas.addEventListener("click", (event) => {
     }
   }
 
-  if (!nearest) {
+  return nearest;
+}
+
+canvas.addEventListener("contextmenu", (event) => {
+  event.preventDefault();
+});
+
+canvas.addEventListener("pointerdown", (event) => {
+  if (state.mode !== "3d") {
+    return;
+  }
+
+  event.preventDefault();
+  state.camera.dragging = true;
+  state.camera.dragMode = (event.button === 2 || event.shiftKey || event.altKey) ? "pan" : "orbit";
+  state.camera.dragDistance = 0;
+  state.camera.pointerId = event.pointerId;
+  state.camera.lastX = event.clientX;
+  state.camera.lastY = event.clientY;
+  canvas.setPointerCapture(event.pointerId);
+});
+
+canvas.addEventListener("pointermove", (event) => {
+  if (!state.camera.dragging || state.mode !== "3d") {
+    return;
+  }
+
+  const dx = event.clientX - state.camera.lastX;
+  const dy = event.clientY - state.camera.lastY;
+  state.camera.lastX = event.clientX;
+  state.camera.lastY = event.clientY;
+  state.camera.dragDistance += Math.abs(dx) + Math.abs(dy);
+
+  if (state.camera.dragMode === "pan") {
+    panCameraByPixels(dx, dy);
+  } else {
+    state.camera.yaw += dx * 0.0055;
+    state.camera.pitch = clamp(state.camera.pitch - dy * 0.0036, 0.52, 1.34);
+  }
+});
+
+canvas.addEventListener("pointerup", (event) => {
+  if (state.camera.pointerId === event.pointerId) {
+    canvas.releasePointerCapture(event.pointerId);
+  }
+  if (state.camera.dragDistance > 4) {
+    state.camera.lastDragAt = Date.now();
+  }
+  state.camera.dragging = false;
+  state.camera.dragMode = null;
+  state.camera.pointerId = null;
+  state.camera.dragDistance = 0;
+});
+
+canvas.addEventListener("pointercancel", () => {
+  state.camera.dragging = false;
+  state.camera.dragMode = null;
+  state.camera.pointerId = null;
+  state.camera.dragDistance = 0;
+});
+
+canvas.addEventListener("wheel", (event) => {
+  if (state.mode !== "3d") {
+    return;
+  }
+
+  event.preventDefault();
+  state.camera.distance = clamp(state.camera.distance + event.deltaY * 0.45, 420, 2100);
+}, { passive: false });
+
+window.addEventListener("keydown", (event) => {
+  if (state.mode !== "3d") {
+    return;
+  }
+
+  const targetTag = event.target && event.target.tagName ? event.target.tagName.toLowerCase() : "";
+  if (targetTag === "input" || targetTag === "textarea") {
+    return;
+  }
+
+  const panStep = Math.max(26, state.camera.distance * 0.03);
+  const zoomStep = 55;
+
+  if (event.key === "+" || event.key === "=") {
+    state.camera.distance = clamp(state.camera.distance - zoomStep, 420, 2100);
+    event.preventDefault();
+    return;
+  }
+  if (event.key === "-" || event.key === "_") {
+    state.camera.distance = clamp(state.camera.distance + zoomStep, 420, 2100);
+    event.preventDefault();
+    return;
+  }
+
+  if (event.key === "ArrowLeft") {
+    panCameraByPixels(panStep, 0);
+    event.preventDefault();
+    return;
+  }
+  if (event.key === "ArrowRight") {
+    panCameraByPixels(-panStep, 0);
+    event.preventDefault();
+    return;
+  }
+  if (event.key === "ArrowUp") {
+    panCameraByPixels(0, panStep);
+    event.preventDefault();
+    return;
+  }
+  if (event.key === "ArrowDown") {
+    panCameraByPixels(0, -panStep);
+    event.preventDefault();
+  }
+});
+
+canvas.addEventListener("click", (event) => {
+  if (state.mode === "3d" && Date.now() - state.camera.lastDragAt < 180) {
+    return;
+  }
+
+  const rect = canvas.getBoundingClientRect();
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+  const hit = pickHitNode(x, y);
+
+  if (!hit) {
     closeHostDrawer();
     return;
   }
 
-  const selected = state.nodes.get(nearest.hostId);
+  const selected = state.nodes.get(hit.hostId);
   if (!selected) {
     closeHostDrawer();
     return;
   }
-
   openHostDrawer(selected.host);
 });
 
@@ -653,9 +1197,11 @@ settingsForm.addEventListener("submit", (event) => {
   restartPolling();
 });
 
-mapModeButton.addEventListener("click", () => {
-  state.mode = state.mode === "2d" ? "3d" : "2d";
-  updateMapModeLabel();
+modeButton.addEventListener("click", () => {
+  const index = MODE_ORDER.indexOf(state.mode);
+  const nextIndex = (index + 1) % MODE_ORDER.length;
+  state.mode = MODE_ORDER[nextIndex];
+  updateModeLabel();
 });
 
 stopButton.addEventListener("click", async () => {
@@ -671,7 +1217,7 @@ stopButton.addEventListener("click", async () => {
 });
 
 function initialize() {
-  updateMapModeLabel();
+  updateModeLabel();
   setStatus("Session is running.", "info");
   resizeCanvas();
   restartPolling();

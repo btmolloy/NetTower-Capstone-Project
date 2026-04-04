@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, nativeImage } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const fsp = require("fs/promises");
@@ -10,6 +10,7 @@ const RUNTIME_DIR = path.join(CODE_ROOT, "runtime");
 const READY_FLAG_PATH = path.join(RUNTIME_DIR, "backend_ready.flag");
 const SHUTDOWN_FLAG_PATH = path.join(RUNTIME_DIR, "shutdown.flag");
 const BRIDGE_SCRIPT_PATH = path.join(__dirname, "supervisor_bridge.py");
+const APP_ICON_PATH = path.join(__dirname, "NetTowerIcon-square.png");
 
 let launchWindow = null;
 let mainWindow = null;
@@ -427,6 +428,7 @@ function createLaunchWindow() {
     height: 700,
     resizable: false,
     title: "NetTower",
+    icon: APP_ICON_PATH,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -453,6 +455,7 @@ function createMainWindow() {
     minWidth: 760,
     minHeight: 520,
     title: "NetTower Session",
+    icon: APP_ICON_PATH,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -505,6 +508,13 @@ ipcMain.handle("runtime:get-topology", async (_event, options) => {
 });
 
 app.whenReady().then(() => {
+  if (process.platform === "darwin" && app.dock) {
+    const dockIcon = nativeImage.createFromPath(APP_ICON_PATH);
+    if (!dockIcon.isEmpty()) {
+      app.dock.setIcon(dockIcon);
+    }
+  }
+
   createLaunchWindow();
 
   app.on("activate", async () => {
