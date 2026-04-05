@@ -55,7 +55,17 @@ class MongoRuntimeManager:
 
         if self._cfg.mongo_reset_on_launch and data_dir.exists():
             self._log.info(f"Removing previous Mongo data dir: {data_dir}")
-            shutil.rmtree(data_dir, ignore_errors=True)
+            try:
+                shutil.rmtree(data_dir)
+            except Exception as exc:
+                raise RuntimeError(
+                    f"failed to remove previous Mongo data dir '{data_dir}': {exc}"
+                ) from exc
+
+            if data_dir.exists():
+                raise RuntimeError(
+                    f"previous Mongo data dir still exists after reset: {data_dir}"
+                )
 
         data_dir.mkdir(parents=True, exist_ok=True)
 
@@ -123,7 +133,12 @@ class MongoRuntimeManager:
             data_dir = self._paths.mongo_data_dir
             if data_dir.exists():
                 self._log.info(f"Deleting Mongo data dir: {data_dir}")
-                shutil.rmtree(data_dir, ignore_errors=True)
+                try:
+                    shutil.rmtree(data_dir)
+                except Exception as exc:
+                    self._log.warning(
+                        f"Failed to delete Mongo data dir on shutdown: {data_dir} ({exc})"
+                    )
 
     def _wait_until_ready(self, host: str, port: int, timeout_seconds: int) -> None:
         deadline = time.time() + max(1, timeout_seconds)

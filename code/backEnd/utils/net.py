@@ -90,6 +90,36 @@ def ip_in_cidr(ip: str, cidr: str) -> bool:
     return addr in net
 
 
+def is_private_rfc1918_ipv4(ip: str) -> bool:
+    """
+    Return True when ip is in RFC1918 private IPv4 space:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
+    """
+    return _is_private_rfc1918_ipv4(ip.strip())
+
+
+def is_private_rfc1918_cidr(cidr: str) -> bool:
+    """
+    Return True when the entire CIDR is inside RFC1918 private IPv4 space.
+    """
+    try:
+        network = ipaddress.ip_network(cidr.strip(), strict=False)
+    except ValueError:
+        return False
+
+    if not isinstance(network, ipaddress.IPv4Network):
+        return False
+
+    private_networks = (
+        ipaddress.ip_network("10.0.0.0/8"),
+        ipaddress.ip_network("172.16.0.0/12"),
+        ipaddress.ip_network("192.168.0.0/16"),
+    )
+    return any(network.subnet_of(private_net) for private_net in private_networks)
+
+
 def detect_interface_network_cidr(iface: str) -> str:
     """
     Detect the IPv4 network CIDR for a given interface.
@@ -146,6 +176,96 @@ def detect_interface_network_cidr(iface: str) -> str:
 
     network = ipaddress.ip_interface(f"{chosen[0]}/{chosen[1]}").network
     return str(network)
+
+
+def detect_interface_ipv4(iface: str) -> str:
+    """
+    Detect the best IPv4 address for a given interface.
+
+    Preference order:
+    1. RFC1918 private address
+    2. Non-APIPA address
+    3. Any non-loopback IPv4
+    """
+    if not iface or not iface.strip():
+        raise ValueError("interface is required for IPv4 detection")
+
+    if psutil is None:
+        raise ValueError(
+            "psutil is required for interface IPv4 detection but is not installed"
+        )
+
+    iface_addrs_map = psutil.net_if_addrs()
+    matched_name = _match_interface_name(iface.strip(), list(iface_addrs_map.keys()))
+    if matched_name is None:
+        raise ValueError(f"interface not found: {iface}")
+
+    iface_addrs = iface_addrs_map.get(matched_name)
+    if not iface_addrs:
+        raise ValueError(f"interface not found: {iface}")
+
+    best_private: str | None = None
+    best_non_apipa: str | None = None
+    best_any: str | None = None
+
+    for addr in iface_addrs:
+        if addr.family != socket.AF_INET or not addr.address:
+            continue
+
+        ip_str = addr.address
+        if _is_loopback_ipv4(ip_str):
+            continue
+
+        if best_any is None:
+            best_any = ip_str
+
+        if not _is_apipa_ipv4(ip_str) and best_non_apipa is None:
+            best_non_apipa = ip_str
+
+        if _is_private_rfc1918_ipv4(ip_str) and best_private is None:
+            best_private = ip_str
+
+    chosen = best_private or best_non_apipa or best_any
+    if chosen is None:
+        raise ValueError(f"no IPv4 address found for interface: {matched_name}")
+
+    return chosen
+
+
+def detect_interface_mac(iface: str) -> str:
+    """
+    Detect the primary MAC address for a given interface.
+    """
+    if not iface or not iface.strip():
+        raise ValueError("interface is required for MAC detection")
+
+    if psutil is None:
+        raise ValueError(
+            "psutil is required for interface MAC detection but is not installed"
+        )
+
+    iface_addrs_map = psutil.net_if_addrs()
+    matched_name = _match_interface_name(iface.strip(), list(iface_addrs_map.keys()))
+    if matched_name is None:
+        raise ValueError(f"interface not found: {iface}")
+
+    iface_addrs = iface_addrs_map.get(matched_name)
+    if not iface_addrs:
+        raise ValueError(f"interface not found: {iface}")
+
+    for addr in iface_addrs:
+        candidate = (getattr(addr, "address", None) or "").strip()
+        if not candidate:
+            continue
+        try:
+            normalized = normalize_mac(candidate)
+        except Exception:
+            continue
+
+        if normalized != "00:00:00:00:00:00":
+            return normalized
+
+    raise ValueError(f"no MAC address found for interface: {matched_name}")
 
 
 def extract_oui(mac: str) -> Optional[str]:

@@ -62,11 +62,13 @@ class mongo_client_manager:
         hosts.create_index("macs")
         hosts.create_index("ips")
         hosts.create_index("last_seen")
+        hosts.create_index("role")
 
         # Edges
         edges.create_index("edge_key", unique=True)
         edges.create_index([("a_host_id", 1), ("b_host_id", 1), ("proto", 1)])
         edges.create_index("last_seen")
+        edges.create_index("relation")
 
         self._handles = mongo_handles(
             client=client,

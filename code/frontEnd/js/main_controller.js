@@ -2,6 +2,9 @@ const canvas = document.getElementById("topology-canvas");
 const canvasEmpty = document.getElementById("canvas-empty");
 const stopButton = document.getElementById("stop-session-btn");
 const modeButton = document.getElementById("map-mode-btn");
+const hostFilterButton = document.getElementById("host-filter-btn");
+const zoomSlider = document.getElementById("zoom-slider");
+const zoomSliderFill = document.getElementById("zoom-slider-fill");
 const settingsButton = document.getElementById("settings-btn");
 const mainStatusElement = document.getElementById("main-status");
 const countsStatusElement = document.getElementById("counts-status");
@@ -14,10 +17,29 @@ const closeDrawerButton = document.getElementById("close-drawer-btn");
 
 const settingsDrawer = document.getElementById("settings-drawer");
 const closeSettingsButton = document.getElementById("close-settings-btn");
+const settingsTabDisplayButton = document.getElementById("settings-tab-display");
+const settingsTabDataButton = document.getElementById("settings-tab-data");
+const settingsPanelDisplay = document.getElementById("settings-panel-display");
+const settingsPanelData = document.getElementById("settings-panel-data");
 const settingsForm = document.getElementById("settings-form");
+const hideStaleToggle = document.getElementById("hide-stale-toggle");
+const keepStalePrivateToggle = document.getElementById("keep-stale-private-toggle");
+const keepStalePrivateField = document.getElementById("keep-stale-private-field");
+const staleDependentOptions = document.getElementById("stale-dependent-options");
+const staleThresholdField = document.getElementById("stale-threshold-field");
+const staleThresholdInput = document.getElementById("stale-threshold-input");
+const activeSensorToggle = document.getElementById("active-sensor-toggle");
+const activeIcmpField = document.getElementById("active-icmp-field");
+const activeIcmpToggle = document.getElementById("active-icmp-toggle");
+const activeNmapField = document.getElementById("active-nmap-field");
+const activeNmapToggle = document.getElementById("active-nmap-toggle");
+const activeScopeAllField = document.getElementById("active-scope-all-field");
+const activeScopeAllToggle = document.getElementById("active-scope-all-toggle");
 const refreshIntervalInput = document.getElementById("refresh-interval-input");
 const hostLimitInput = document.getElementById("host-limit-input");
 const edgeLimitInput = document.getElementById("edge-limit-input");
+const refreshDataListButton = document.getElementById("refresh-data-list-btn");
+const topologyTextList = document.getElementById("topology-text-list");
 const drawerBackdrop = document.getElementById("drawer-backdrop");
 
 const ctx = canvas.getContext("2d");
@@ -27,6 +49,16 @@ const MODE_LABELS = {
   "3d": "3D",
   idle: "Idle",
 };
+const HOST_FILTER_ORDER = ["all", "public", "private"];
+const HOST_FILTER_LABELS = {
+  all: "All",
+  public: "Public",
+  private: "Private",
+};
+const DEFAULT_ZOOM_PERCENT = 33;
+const CAMERA_ZOOM_MIN_DISTANCE = 420;
+const CAMERA_ZOOM_DEFAULT_DISTANCE = 900;
+const CAMERA_ZOOM_MAX_DISTANCE = 1800;
 
 const state = {
   mode: "2d",
@@ -35,9 +67,25 @@ const state = {
   hitRegions: [],
   selectedHostId: null,
   selectedHost: null,
+  hostFilter: "all",
+  zoomPercent: DEFAULT_ZOOM_PERCENT,
+  localIdentity: {
+    interface: null,
+    ip: null,
+    mac: null,
+  },
+  lastSnapshot: null,
   refreshIntervalMs: 3000,
   hostLimit: 250,
   edgeLimit: 500,
+  activeSensorEnabled: false,
+  activeIcmpScanEnabled: true,
+  activeNmapScanEnabled: true,
+  allowAllActiveTargetsEnabled: false,
+  hideStaleHostsEnabled: true,
+  keepStalePrivateHostsEnabled: true,
+  staleHostThresholdSeconds: 180,
+  settingsTab: "display",
   pollingTimer: null,
   fetchInFlight: false,
   animationHandle: null,
@@ -117,6 +165,203 @@ function edgeColor(lastSeen) {
   return "rgba(182, 70, 98, 0.26)";
 }
 
+function normalizeMac(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const compact = value.trim().toLowerCase().replaceAll("-", ":");
+  return /^([0-9a-f]{2}:){5}[0-9a-f]{2}$/.test(compact) ? compact : null;
+}
+
+function parseIPv4(value) {
+  const text = String(value || "").trim();
+  const octets = text.split(".");
+  if (octets.length !== 4) {
+    return null;
+  }
+
+  const parsed = [];
+  for (const octet of octets) {
+    if (!/^\d+$/.test(octet)) {
+      return null;
+    }
+    const n = Number.parseInt(octet, 10);
+    if (!Number.isInteger(n) || n < 0 || n > 255) {
+      return null;
+    }
+    parsed.push(n);
+  }
+  return parsed;
+}
+
+function isPrivateIPv4(value) {
+  const octets = parseIPv4(value);
+  if (!octets) {
+    return false;
+  }
+  const [a, b] = octets;
+  if (a === 10) {
+    return true;
+  }
+  if (a === 172 && b >= 16 && b <= 31) {
+    return true;
+  }
+  if (a === 192 && b === 168) {
+    return true;
+  }
+  return false;
+}
+
+function isPublicIPv4(value) {
+  const octets = parseIPv4(value);
+  if (!octets) {
+    return false;
+  }
+  if (isPrivateIPv4(value)) {
+    return false;
+  }
+
+  const [a, b] = octets;
+  if (a === 0 || a === 127) {
+    return false;
+  }
+  if (a === 169 && b === 254) {
+    return false;
+  }
+  if (a >= 224) {
+    return false;
+  }
+  if (a === 100 && b >= 64 && b <= 127) {
+    return false;
+  }
+
+  return true;
+}
+
+function isLocalHost(host) {
+  const localIp = state.localIdentity.ip ? String(state.localIdentity.ip) : null;
+  if (localIp && Array.isArray(host.ips) && host.ips.includes(localIp)) {
+    return true;
+  }
+
+  const localMac = normalizeMac(state.localIdentity.mac);
+  if (localMac && Array.isArray(host.macs)) {
+    return host.macs.some((mac) => normalizeMac(mac) === localMac);
+  }
+
+  return false;
+}
+
+function hostMatchesFilter(host) {
+  if (isLocalHost(host)) {
+    return true;
+  }
+
+  if (state.hostFilter === "all") {
+    return true;
+  }
+
+  const ips = Array.isArray(host.ips) ? host.ips : [];
+  if (state.hostFilter === "private") {
+    return ips.some((ip) => isPrivateIPv4(ip));
+  }
+  if (state.hostFilter === "public") {
+    return ips.some((ip) => isPublicIPv4(ip));
+  }
+
+  return true;
+}
+
+function hostPassesStaleVisibility(host) {
+  if (isLocalHost(host)) {
+    return true;
+  }
+  if (!state.hideStaleHostsEnabled) {
+    return true;
+  }
+  if (state.keepStalePrivateHostsEnabled) {
+    const ips = Array.isArray(host.ips) ? host.ips : [];
+    if (ips.some((ip) => isPrivateIPv4(ip))) {
+      return true;
+    }
+  }
+  return ageSeconds(host.last_seen) <= state.staleHostThresholdSeconds;
+}
+
+function hostShouldRender(host) {
+  return hostMatchesFilter(host) && hostPassesStaleVisibility(host);
+}
+
+function zoomPercentToScale(percent) {
+  const p = clamp(percent, 0, 100);
+  if (p >= DEFAULT_ZOOM_PERCENT) {
+    const t = (p - DEFAULT_ZOOM_PERCENT) / (100 - DEFAULT_ZOOM_PERCENT);
+    return 1 + t * 1.05;
+  }
+  const t = (DEFAULT_ZOOM_PERCENT - p) / DEFAULT_ZOOM_PERCENT;
+  return 1 - t * 0.45;
+}
+
+function zoomPercentToCameraDistance(percent) {
+  const p = clamp(percent, 0, 100);
+  if (p >= DEFAULT_ZOOM_PERCENT) {
+    const t = (p - DEFAULT_ZOOM_PERCENT) / (100 - DEFAULT_ZOOM_PERCENT);
+    return CAMERA_ZOOM_DEFAULT_DISTANCE - t * (CAMERA_ZOOM_DEFAULT_DISTANCE - CAMERA_ZOOM_MIN_DISTANCE);
+  }
+  const t = (DEFAULT_ZOOM_PERCENT - p) / DEFAULT_ZOOM_PERCENT;
+  return CAMERA_ZOOM_DEFAULT_DISTANCE + t * (CAMERA_ZOOM_MAX_DISTANCE - CAMERA_ZOOM_DEFAULT_DISTANCE);
+}
+
+function cameraDistanceToZoomPercent(distance) {
+  const d = clamp(distance, CAMERA_ZOOM_MIN_DISTANCE, CAMERA_ZOOM_MAX_DISTANCE);
+  if (d <= CAMERA_ZOOM_DEFAULT_DISTANCE) {
+    const t = (CAMERA_ZOOM_DEFAULT_DISTANCE - d) / (CAMERA_ZOOM_DEFAULT_DISTANCE - CAMERA_ZOOM_MIN_DISTANCE);
+    return DEFAULT_ZOOM_PERCENT + t * (100 - DEFAULT_ZOOM_PERCENT);
+  }
+  const t = (d - CAMERA_ZOOM_DEFAULT_DISTANCE) / (CAMERA_ZOOM_MAX_DISTANCE - CAMERA_ZOOM_DEFAULT_DISTANCE);
+  return DEFAULT_ZOOM_PERCENT - t * DEFAULT_ZOOM_PERCENT;
+}
+
+function updateZoomSliderVisual() {
+  const percent = clamp(state.zoomPercent, 0, 100);
+  zoomSlider.value = String(Math.round(percent));
+  zoomSliderFill.style.height = `${percent}%`;
+}
+
+function applyZoomPercent(percent, options = {}) {
+  const p = clamp(percent, 0, 100);
+  const syncCamera = options.syncCamera !== false;
+  state.zoomPercent = p;
+  if (syncCamera) {
+    state.camera.distance = clamp(
+      zoomPercentToCameraDistance(p),
+      CAMERA_ZOOM_MIN_DISTANCE,
+      2100,
+    );
+  }
+  updateZoomSliderVisual();
+}
+
+function syncZoomFromCameraDistance() {
+  const percent = cameraDistanceToZoomPercent(state.camera.distance);
+  applyZoomPercent(percent, { syncCamera: false });
+}
+
+function applyScreenZoom(projected) {
+  const zoomScale = zoomPercentToScale(state.zoomPercent);
+  if (!projected) {
+    return null;
+  }
+  const cx = state.width / 2;
+  const cy = state.height / 2;
+  return {
+    ...projected,
+    x: cx + (projected.x - cx) * zoomScale,
+    y: cy + (projected.y - cy) * zoomScale,
+    scale: (projected.scale || 1) * Math.sqrt(zoomScale),
+  };
+}
+
 function setStatus(message, level = "info") {
   mainStatusElement.textContent = message;
   mainStatusElement.classList.remove("status-info", "status-success", "status-error");
@@ -141,6 +386,10 @@ function modeCaption() {
 function updateModeLabel() {
   modeButton.textContent = `Mode: ${MODE_LABELS[state.mode]}`;
   liveCaptionElement.textContent = modeCaption();
+}
+
+function updateHostFilterLabel() {
+  hostFilterButton.textContent = `Hosts: ${HOST_FILTER_LABELS[state.hostFilter]}`;
 }
 
 function updateBackdrop() {
@@ -169,7 +418,59 @@ function closeSettingsDrawer() {
   updateBackdrop();
 }
 
+function setSettingsTab(tabName) {
+  state.settingsTab = tabName === "data" ? "data" : "display";
+  const displayActive = state.settingsTab === "display";
+
+  settingsTabDisplayButton.classList.toggle("is-active", displayActive);
+  settingsTabDataButton.classList.toggle("is-active", !displayActive);
+  settingsTabDisplayButton.setAttribute("aria-selected", displayActive ? "true" : "false");
+  settingsTabDataButton.setAttribute("aria-selected", displayActive ? "false" : "true");
+  settingsPanelDisplay.classList.toggle("is-active", displayActive);
+  settingsPanelData.classList.toggle("is-active", !displayActive);
+
+  if (!displayActive) {
+    renderTopologyTextList(state.lastSnapshot);
+  }
+}
+
+function updateStaleThresholdFieldState() {
+  const enabled = Boolean(hideStaleToggle.checked);
+  keepStalePrivateToggle.disabled = !enabled;
+  staleThresholdInput.disabled = !enabled;
+  keepStalePrivateField.classList.toggle("is-disabled", !enabled);
+  staleThresholdField.classList.toggle("is-disabled", !enabled);
+  staleDependentOptions.classList.toggle("is-disabled", !enabled);
+}
+
+function updateActiveScopeFieldState() {
+  const enabled = Boolean(activeSensorToggle.checked);
+  activeIcmpToggle.disabled = !enabled;
+  activeNmapToggle.disabled = !enabled;
+  activeScopeAllToggle.disabled = !enabled;
+  activeIcmpField.classList.toggle("is-disabled", !enabled);
+  activeNmapField.classList.toggle("is-disabled", !enabled);
+  activeScopeAllField.classList.toggle("is-disabled", !enabled);
+}
+
+function syncSettingsInputsFromState() {
+  activeSensorToggle.checked = state.activeSensorEnabled;
+  activeIcmpToggle.checked = state.activeIcmpScanEnabled;
+  activeNmapToggle.checked = state.activeNmapScanEnabled;
+  activeScopeAllToggle.checked = state.allowAllActiveTargetsEnabled;
+  hideStaleToggle.checked = state.hideStaleHostsEnabled;
+  keepStalePrivateToggle.checked = state.keepStalePrivateHostsEnabled;
+  staleThresholdInput.value = String(state.staleHostThresholdSeconds);
+  refreshIntervalInput.value = String(state.refreshIntervalMs);
+  hostLimitInput.value = String(state.hostLimit);
+  edgeLimitInput.value = String(state.edgeLimit);
+  updateActiveScopeFieldState();
+  updateStaleThresholdFieldState();
+}
+
 function openSettingsDrawer() {
+  syncSettingsInputsFromState();
+  setSettingsTab(state.settingsTab);
   settingsDrawer.classList.add("is-open");
   updateBackdrop();
 }
@@ -200,6 +501,28 @@ function formatPorts(ports) {
   return formatted.join(", ");
 }
 
+function formatServices(services) {
+  if (!Array.isArray(services) || services.length === 0) {
+    return "None";
+  }
+
+  const formatted = services
+    .slice(0, 10)
+    .map((entry) => {
+      if (!Array.isArray(entry) || entry.length < 3) {
+        return escapeHtml(String(entry));
+      }
+      const proto = escapeHtml(entry[0] || "");
+      const port = escapeHtml(entry[1] || "");
+      const service = escapeHtml(entry[2] || "unknown");
+      const product = escapeHtml(entry[3] || "");
+      const version = escapeHtml(entry[4] || "");
+      const detail = [product, version].filter(Boolean).join(" ");
+      return `${proto}/${port} ${service}${detail ? ` (${detail})` : ""}`;
+    });
+  return formatted.join(", ");
+}
+
 function formatTime(value) {
   const ts = parseTimestamp(value);
   if (!ts) {
@@ -208,16 +531,111 @@ function formatTime(value) {
   return new Date(ts).toLocaleString();
 }
 
+function formatAgeText(value) {
+  const age = ageSeconds(value);
+  if (!Number.isFinite(age)) {
+    return "Unknown";
+  }
+  return `${Math.round(age)}s ago`;
+}
+
+function formatSimpleList(values) {
+  if (!Array.isArray(values) || values.length === 0) {
+    return "None";
+  }
+  return values.join(", ");
+}
+
+function formatEdgePortList(ports) {
+  if (!Array.isArray(ports) || ports.length === 0) {
+    return "None";
+  }
+  return ports
+    .slice(0, 12)
+    .map((entry) => (Array.isArray(entry) ? entry.join("/") : String(entry)))
+    .join(", ");
+}
+
+function renderTopologyTextList(snapshot) {
+  if (!topologyTextList) {
+    return;
+  }
+  if (!snapshot || typeof snapshot !== "object") {
+    topologyTextList.textContent = "No topology data yet.";
+    return;
+  }
+
+  const hosts = Array.isArray(snapshot.hosts) ? snapshot.hosts.map(normalizeHost) : [];
+  const validHosts = hosts.filter((host) => host.host_id);
+  const hostIds = new Set(validHosts.map((host) => host.host_id));
+  const edges = Array.isArray(snapshot.edges) ? snapshot.edges.map(normalizeEdge) : [];
+  const validEdges = edges.filter(
+    (edge) => hostIds.has(edge.a_host_id) && hostIds.has(edge.b_host_id),
+  );
+
+  const sortedHosts = validHosts
+    .slice()
+    .sort((left, right) => parseTimestamp(right.last_seen) - parseTimestamp(left.last_seen));
+  const sortedEdges = validEdges
+    .slice()
+    .sort((left, right) => parseTimestamp(right.last_seen) - parseTimestamp(left.last_seen));
+
+  const lines = [];
+  const capturedAt = snapshot.captured_at ? new Date(snapshot.captured_at).toLocaleString() : "Unknown";
+  lines.push(`Captured: ${capturedAt}`);
+  lines.push(`Map Visible: ${state.nodes.size} hosts, ${state.edges.length} edges`);
+  lines.push(`Snapshot Total: ${validHosts.length} hosts, ${validEdges.length} edges`);
+  lines.push("");
+  lines.push("HOSTS");
+
+  if (sortedHosts.length === 0) {
+    lines.push("(none)");
+  } else {
+    sortedHosts.forEach((host, index) => {
+      const localLabel = isLocalHost(host) ? " [LOCAL]" : "";
+      lines.push(`${index + 1}. ${host.host_id}${localLabel}`);
+      lines.push(`   IPs: ${formatSimpleList(host.ips)}`);
+      lines.push(`   MACs: ${formatSimpleList(host.macs)}`);
+      const roleLabel = host.role ? `${host.role} (${Math.round((host.role_confidence || 0) * 100)}%)` : "Unknown";
+      lines.push(`   Vendor: ${host.vendor || "Unknown"} | OS: ${host.os_guess || "Unknown"} | Role: ${roleLabel}`);
+      lines.push(`   First Seen: ${formatTime(host.first_seen)}`);
+      lines.push(`   Last Seen: ${formatTime(host.last_seen)} (${formatAgeText(host.last_seen)})`);
+      lines.push("");
+    });
+  }
+
+  lines.push("EDGES");
+  if (sortedEdges.length === 0) {
+    lines.push("(none)");
+  } else {
+    sortedEdges.forEach((edge, index) => {
+      const proto = edge.proto || "unknown";
+      const relation = edge.relation || "traffic";
+      const confidenceText = Number.isFinite(edge.confidence) ? `${Math.round(edge.confidence * 100)}%` : "n/a";
+      lines.push(`${index + 1}. ${edge.a_host_id} <-> ${edge.b_host_id}`);
+      lines.push(`   Proto: ${proto} | Relation: ${relation} | Confidence: ${confidenceText} | Count: ${edge.count} | Last Seen: ${formatAgeText(edge.last_seen)}`);
+      lines.push(`   Ports: ${formatEdgePortList(edge.ports)}`);
+      lines.push("");
+    });
+  }
+
+  topologyTextList.textContent = lines.join("\n").trimEnd();
+}
+
 function renderHostDetails(host) {
   hostDetailsElement.innerHTML = `
     <div class="detail-row"><span>Host ID</span><strong>${escapeHtml(host.host_id)}</strong></div>
     <div class="detail-row"><span>IPs</span><strong>${formatArray(host.ips)}</strong></div>
     <div class="detail-row"><span>MACs</span><strong>${formatArray(host.macs)}</strong></div>
+    <div class="detail-row"><span>Hostnames</span><strong>${formatArray(host.hostnames)}</strong></div>
     <div class="detail-row"><span>Vendor</span><strong>${escapeHtml(host.vendor || "Unknown")}</strong></div>
     <div class="detail-row"><span>OS Guess</span><strong>${escapeHtml(host.os_guess || "Unknown")}</strong></div>
+    <div class="detail-row"><span>Role</span><strong>${escapeHtml(host.role || "Unknown")}</strong></div>
+    <div class="detail-row"><span>Role Confidence</span><strong>${Number.isFinite(host.role_confidence) ? `${Math.round(host.role_confidence * 100)}%` : "Unknown"}</strong></div>
     <div class="detail-row"><span>First Seen</span><strong>${escapeHtml(formatTime(host.first_seen))}</strong></div>
     <div class="detail-row"><span>Last Seen</span><strong>${escapeHtml(formatTime(host.last_seen))}</strong></div>
     <div class="detail-row"><span>Ports</span><strong>${formatPorts(host.ports)}</strong></div>
+    <div class="detail-row"><span>Services</span><strong>${formatServices(host.services)}</strong></div>
   `;
 }
 
@@ -261,11 +679,16 @@ function normalizeHost(raw) {
     host_id: String(raw.host_id || ""),
     ips: Array.isArray(raw.ips) ? raw.ips.filter(Boolean).map(String) : [],
     macs: Array.isArray(raw.macs) ? raw.macs.filter(Boolean).map(String) : [],
+    hostnames: Array.isArray(raw.hostnames) ? raw.hostnames.filter(Boolean).map(String) : [],
     vendor: raw.vendor ? String(raw.vendor) : null,
     os_guess: raw.os_guess ? String(raw.os_guess) : null,
+    role: raw.role ? String(raw.role) : null,
+    role_confidence: Number.isFinite(Number(raw.role_confidence)) ? Number(raw.role_confidence) : null,
+    role_scores: raw.role_scores && typeof raw.role_scores === "object" ? raw.role_scores : {},
     first_seen: raw.first_seen ? String(raw.first_seen) : null,
     last_seen: raw.last_seen ? String(raw.last_seen) : null,
     ports: Array.isArray(raw.ports) ? raw.ports : [],
+    services: Array.isArray(raw.services) ? raw.services : [],
   };
 }
 
@@ -275,6 +698,10 @@ function normalizeEdge(raw) {
     a_host_id: String(raw.a_host_id || ""),
     b_host_id: String(raw.b_host_id || ""),
     proto: raw.proto ? String(raw.proto) : "",
+    relation: raw.relation ? String(raw.relation) : "traffic",
+    inferred: Boolean(raw.inferred),
+    confidence: Number.isFinite(Number(raw.confidence)) ? Number(raw.confidence) : 1,
+    evidence: Array.isArray(raw.evidence) ? raw.evidence : [],
     first_seen: raw.first_seen ? String(raw.first_seen) : null,
     last_seen: raw.last_seen ? String(raw.last_seen) : null,
     count: Number.isFinite(Number(raw.count)) ? Number(raw.count) : 0,
@@ -283,13 +710,16 @@ function normalizeEdge(raw) {
 }
 
 function applySnapshot(snapshot) {
+  state.lastSnapshot = snapshot;
   const hosts = Array.isArray(snapshot.hosts) ? snapshot.hosts.map(normalizeHost) : [];
   const edges = Array.isArray(snapshot.edges) ? snapshot.edges.map(normalizeEdge) : [];
 
   const validHosts = hosts.filter((host) => host.host_id);
-  const visibleNodeIds = new Set(validHosts.map((host) => host.host_id));
+  const visibleHosts = validHosts.filter((host) => hostShouldRender(host));
+  const allHostIds = new Set(validHosts.map((host) => host.host_id));
+  const visibleNodeIds = new Set(visibleHosts.map((host) => host.host_id));
 
-  for (const host of validHosts) {
+  for (const host of visibleHosts) {
     ensureNode(host);
   }
 
@@ -300,7 +730,10 @@ function applySnapshot(snapshot) {
   }
 
   const degreeMap = new Map();
-  const validEdges = edges.filter(
+  const allValidEdges = edges.filter(
+    (edge) => allHostIds.has(edge.a_host_id) && allHostIds.has(edge.b_host_id),
+  );
+  const validEdges = allValidEdges.filter(
     (edge) => visibleNodeIds.has(edge.a_host_id) && visibleNodeIds.has(edge.b_host_id),
   );
   for (const edge of validEdges) {
@@ -322,9 +755,10 @@ function applySnapshot(snapshot) {
   }
 
   const lastUpdate = snapshot.captured_at ? new Date(snapshot.captured_at).toLocaleTimeString() : "--";
-  countsStatusElement.textContent = `Hosts: ${validHosts.length} | Edges: ${validEdges.length}`;
+  countsStatusElement.textContent = `Hosts: ${visibleHosts.length}/${validHosts.length} | Edges: ${validEdges.length}/${allValidEdges.length}`;
   updatedStatusElement.textContent = `Last update: ${lastUpdate}`;
-  canvasEmpty.classList.toggle("is-hidden", validHosts.length > 0);
+  canvasEmpty.classList.toggle("is-hidden", visibleHosts.length > 0);
+  renderTopologyTextList(snapshot);
 }
 
 function drawBackground() {
@@ -464,6 +898,40 @@ function shadeHex(hex, amount) {
   const g = clamp(rgb.g + amount, 0, 255);
   const b = clamp(rgb.b + amount, 0, 255);
   return `rgb(${r}, ${g}, ${b})`;
+}
+
+function drawLocalHostStar(cx, cy, outerRadius, scale = 1) {
+  const spikes = 5;
+  const innerRadius = Math.max(outerRadius * 0.74, outerRadius - 6.5);
+  const step = Math.PI / spikes;
+  let angle = -Math.PI / 2;
+  const points = [];
+
+  for (let i = 0; i < spikes * 2; i += 1) {
+    const radius = i % 2 === 0 ? outerRadius : innerRadius;
+    points.push({
+      x: cx + Math.cos(angle) * radius,
+      y: cy + Math.sin(angle) * radius,
+    });
+    angle += step;
+  }
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.98)";
+  ctx.lineWidth = clamp(1.5 * scale, 1.1, 2.7);
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.shadowColor = "rgba(255, 255, 255, 0.35)";
+  ctx.shadowBlur = clamp(4.5 * scale, 2.5, 8.5);
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i += 1) {
+    ctx.lineTo(points[i].x, points[i].y);
+  }
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawWireframeGrid() {
@@ -672,7 +1140,7 @@ function drawNodesAndEdges2D(projectionForNode) {
   const projections = new Map();
   state.hitRegions = [];
   for (const [hostId, node] of state.nodes.entries()) {
-    projections.set(hostId, projectionForNode(node));
+    projections.set(hostId, applyScreenZoom(projectionForNode(node)));
   }
 
   ctx.save();
@@ -707,6 +1175,7 @@ function drawNodesAndEdges2D(projectionForNode) {
     const x = projected.x;
     const y = projected.y;
     const selected = state.selectedHostId === node.host.host_id;
+    const isLocal = isLocalHost(node.host);
 
     ctx.beginPath();
     ctx.fillStyle = "rgba(5, 7, 11, 0.45)";
@@ -717,6 +1186,10 @@ function drawNodesAndEdges2D(projectionForNode) {
     ctx.fillStyle = hostRecencyColor(node.host.last_seen);
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
+
+    if (isLocal) {
+      drawLocalHostStar(x, y, radius + 6, projected.scale);
+    }
 
     if (selected) {
       ctx.beginPath();
@@ -810,9 +1283,14 @@ function drawMode3D() {
   for (const entry of sorted) {
     const base = hostRecencyColor(entry.node.host.last_seen);
     const selected = state.selectedHostId === entry.node.host.host_id;
+    const isLocal = isLocalHost(entry.node.host);
     const hit = drawCube(entry.world, entry.size, entry.height, base, selected);
     if (!hit) {
       continue;
+    }
+
+    if (isLocal) {
+      drawLocalHostStar(hit.x, hit.y, Math.max(12, hit.radius * 0.92), clamp(hit.radius * 0.08, 0.85, 1.9));
     }
 
     ctx.fillStyle = "rgba(236, 242, 250, 0.94)";
@@ -1079,6 +1557,7 @@ canvas.addEventListener("wheel", (event) => {
 
   event.preventDefault();
   state.camera.distance = clamp(state.camera.distance + event.deltaY * 0.45, 420, 2100);
+  syncZoomFromCameraDistance();
 }, { passive: false });
 
 window.addEventListener("keydown", (event) => {
@@ -1096,11 +1575,13 @@ window.addEventListener("keydown", (event) => {
 
   if (event.key === "+" || event.key === "=") {
     state.camera.distance = clamp(state.camera.distance - zoomStep, 420, 2100);
+    syncZoomFromCameraDistance();
     event.preventDefault();
     return;
   }
   if (event.key === "-" || event.key === "_") {
     state.camera.distance = clamp(state.camera.distance + zoomStep, 420, 2100);
+    syncZoomFromCameraDistance();
     event.preventDefault();
     return;
   }
@@ -1157,6 +1638,39 @@ closeSettingsButton.addEventListener("click", () => {
   closeSettingsDrawer();
 });
 
+settingsTabDisplayButton.addEventListener("click", () => {
+  setSettingsTab("display");
+});
+
+settingsTabDataButton.addEventListener("click", () => {
+  setSettingsTab("data");
+});
+
+hideStaleToggle.addEventListener("change", () => {
+  updateStaleThresholdFieldState();
+});
+
+activeSensorToggle.addEventListener("change", () => {
+  updateActiveScopeFieldState();
+});
+
+activeScopeAllToggle.addEventListener("change", () => {
+  if (!activeScopeAllToggle.checked) {
+    return;
+  }
+
+  const confirmed = window.confirm(
+    "Are you sure you want to allow active scanning of public internet IPs?",
+  );
+  if (!confirmed) {
+    activeScopeAllToggle.checked = false;
+  }
+});
+
+refreshDataListButton.addEventListener("click", () => {
+  renderTopologyTextList(state.lastSnapshot);
+});
+
 closeDrawerButton.addEventListener("click", () => {
   closeHostDrawer();
 });
@@ -1166,9 +1680,20 @@ drawerBackdrop.addEventListener("click", () => {
   closeSettingsDrawer();
 });
 
-settingsForm.addEventListener("submit", (event) => {
+settingsForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
+  const activeSensorEnabled = Boolean(activeSensorToggle.checked);
+  const activeIcmpScanEnabled = Boolean(activeIcmpToggle.checked);
+  const activeNmapScanEnabled = Boolean(activeNmapToggle.checked);
+  const allowAllActiveTargetsEnabled = Boolean(activeScopeAllToggle.checked);
+  const hideStaleHostsEnabled = Boolean(hideStaleToggle.checked);
+  const keepStalePrivateHostsEnabled = Boolean(keepStalePrivateToggle.checked);
+  const staleHostThresholdSeconds = clamp(
+    Number.parseInt(staleThresholdInput.value, 10) || 180,
+    15,
+    7200,
+  );
   const refreshInterval = clamp(
     Number.parseInt(refreshIntervalInput.value, 10) || 3000,
     500,
@@ -1185,13 +1710,46 @@ settingsForm.addEventListener("submit", (event) => {
     4000,
   );
 
+  activeSensorToggle.checked = activeSensorEnabled;
+  activeIcmpToggle.checked = activeIcmpScanEnabled;
+  activeNmapToggle.checked = activeNmapScanEnabled;
+  activeScopeAllToggle.checked = allowAllActiveTargetsEnabled;
+  hideStaleToggle.checked = hideStaleHostsEnabled;
+  keepStalePrivateToggle.checked = keepStalePrivateHostsEnabled;
+  staleThresholdInput.value = String(staleHostThresholdSeconds);
   refreshIntervalInput.value = String(refreshInterval);
   hostLimitInput.value = String(hostLimit);
   edgeLimitInput.value = String(edgeLimit);
+  updateActiveScopeFieldState();
+  updateStaleThresholdFieldState();
 
+  try {
+    const runtimeSettings = await window.nettower.updateSessionSettings({
+      enable_active_discovery: activeSensorEnabled,
+      enable_icmp_scan: activeIcmpScanEnabled,
+      enable_nmap_scan: activeNmapScanEnabled,
+      allow_all_active_targets: allowAllActiveTargetsEnabled,
+    });
+    state.activeSensorEnabled = Boolean(runtimeSettings.enable_active_discovery);
+    state.activeIcmpScanEnabled = Boolean(runtimeSettings.enable_icmp_scan);
+    state.activeNmapScanEnabled = Boolean(runtimeSettings.enable_nmap_scan);
+    state.allowAllActiveTargetsEnabled = Boolean(runtimeSettings.allow_all_active_targets);
+  } catch (error) {
+    setStatus(`Failed to apply active sensor settings: ${error.message}`, "error");
+    syncSettingsInputsFromState();
+    return;
+  }
+
+  state.hideStaleHostsEnabled = hideStaleHostsEnabled;
+  state.keepStalePrivateHostsEnabled = keepStalePrivateHostsEnabled;
+  state.staleHostThresholdSeconds = staleHostThresholdSeconds;
   state.refreshIntervalMs = refreshInterval;
   state.hostLimit = hostLimit;
   state.edgeLimit = edgeLimit;
+
+  if (state.lastSnapshot) {
+    applySnapshot(state.lastSnapshot);
+  }
 
   closeSettingsDrawer();
   restartPolling();
@@ -1201,7 +1759,30 @@ modeButton.addEventListener("click", () => {
   const index = MODE_ORDER.indexOf(state.mode);
   const nextIndex = (index + 1) % MODE_ORDER.length;
   state.mode = MODE_ORDER[nextIndex];
+  if (state.mode === "3d") {
+    state.camera.distance = clamp(
+      zoomPercentToCameraDistance(state.zoomPercent),
+      CAMERA_ZOOM_MIN_DISTANCE,
+      2100,
+    );
+  }
   updateModeLabel();
+});
+
+zoomSlider.addEventListener("input", () => {
+  const value = Number.parseInt(zoomSlider.value, 10);
+  applyZoomPercent(Number.isFinite(value) ? value : DEFAULT_ZOOM_PERCENT, { syncCamera: true });
+});
+
+hostFilterButton.addEventListener("click", () => {
+  const index = HOST_FILTER_ORDER.indexOf(state.hostFilter);
+  const nextIndex = (index + 1) % HOST_FILTER_ORDER.length;
+  state.hostFilter = HOST_FILTER_ORDER[nextIndex];
+  updateHostFilterLabel();
+
+  if (state.lastSnapshot) {
+    applySnapshot(state.lastSnapshot);
+  }
 });
 
 stopButton.addEventListener("click", async () => {
@@ -1216,8 +1797,44 @@ stopButton.addEventListener("click", async () => {
   }
 });
 
-function initialize() {
+async function initialize() {
+  try {
+    const identity = await window.nettower.getLocalIdentity();
+    if (identity && typeof identity === "object") {
+      state.localIdentity = {
+        interface: identity.interface ? String(identity.interface) : null,
+        ip: identity.ip ? String(identity.ip) : null,
+        mac: identity.mac ? String(identity.mac) : null,
+      };
+    }
+  } catch {
+    state.localIdentity = {
+      interface: null,
+      ip: null,
+      mac: null,
+    };
+  }
+
+  try {
+    const sessionSettings = await window.nettower.getSessionSettings();
+    if (sessionSettings && typeof sessionSettings === "object") {
+      state.activeSensorEnabled = Boolean(sessionSettings.enable_active_discovery);
+      state.activeIcmpScanEnabled = Boolean(sessionSettings.enable_icmp_scan);
+      state.activeNmapScanEnabled = Boolean(sessionSettings.enable_nmap_scan);
+      state.allowAllActiveTargetsEnabled = Boolean(sessionSettings.allow_all_active_targets);
+    }
+  } catch {
+    state.activeSensorEnabled = false;
+    state.activeIcmpScanEnabled = true;
+    state.activeNmapScanEnabled = true;
+    state.allowAllActiveTargetsEnabled = false;
+  }
+
+  applyZoomPercent(DEFAULT_ZOOM_PERCENT, { syncCamera: true });
   updateModeLabel();
+  updateHostFilterLabel();
+  syncSettingsInputsFromState();
+  setSettingsTab("display");
   setStatus("Session is running.", "info");
   resizeCanvas();
   restartPolling();

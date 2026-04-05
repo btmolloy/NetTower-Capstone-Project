@@ -4,7 +4,7 @@ import json
 import os
 from typing import Any, Optional, Tuple
 
-from backEnd.models.events import base_event, host_seen
+from backEnd.models.events import base_event, host_seen, os_hint_seen, port_seen, service_seen
 from backEnd.utils.net import extract_oui
 from backEnd.utils.logging import get_logger
 
@@ -81,6 +81,43 @@ class enricher:
             if role:
                 enrichment_data["role_hint"] = role
 
+            os_guess = self._os_guess(vendor=vendor, hostname=event.hostname)
+            if os_guess:
+                enrichment_data["os_guess"] = os_guess
+
+        if isinstance(event, port_seen):
+            os_guess = self._os_guess_from_port(
+                port=int(event.port),
+                state=(event.state or "unknown"),
+            )
+            if os_guess:
+                enrichment_data["os_guess"] = os_guess
+
+        if isinstance(event, service_seen):
+            role_hint = self._role_hint_from_service(
+                service=event.service,
+                product=event.product,
+                version=event.version,
+                extrainfo=event.extrainfo,
+                port=int(event.port),
+            )
+            if role_hint:
+                enrichment_data["role_hint"] = role_hint
+
+            os_guess = self._os_guess_from_service(
+                service=event.service,
+                product=event.product,
+                version=event.version,
+                extrainfo=event.extrainfo,
+            )
+            if os_guess:
+                enrichment_data["os_guess"] = os_guess
+
+        if isinstance(event, os_hint_seen):
+            os_name = (event.os_name or "").strip()
+            if os_name:
+                enrichment_data["os_guess"] = os_name
+
         return event, enrichment_data
 
     def _vendor_from_mac(self, mac: Optional[str]) -> Optional[str]:
@@ -117,4 +154,99 @@ class enricher:
                     if isinstance(role, str) and role.strip():
                         return role.strip()
 
+        return None
+
+    def _os_guess(self, vendor: Optional[str], hostname: Optional[str]) -> Optional[str]:
+        vendor_l = (vendor or "").lower()
+        hostname_l = (hostname or "").lower()
+
+        # Conservative coarse-grained guesses only.
+        if "apple" in vendor_l:
+            return "Apple (macOS/iOS)"
+        if "microsoft" in vendor_l:
+            return "Windows"
+        if "raspberry" in vendor_l:
+            return "Linux (Raspberry Pi)"
+        if "cisco" in vendor_l or "ubiquiti" in vendor_l or "juniper" in vendor_l:
+            return "Network appliance"
+
+        if hostname_l:
+            if any(k in hostname_l for k in ["win-", "windows", ".localdomain", "desktop-"]):
+                return "Windows"
+            if any(k in hostname_l for k in ["ubuntu", "debian", "fedora", "arch", "linux"]):
+                return "Linux"
+            if any(k in hostname_l for k in ["macbook", "imac", "iphone", "ipad"]):
+                return "Apple (macOS/iOS)"
+
+        return None
+
+    def _os_guess_from_port(self, port: int, state: str) -> Optional[str]:
+        if state.strip().lower() != "open":
+            return None
+
+        if port in {3389, 5985, 5986}:
+            return "Windows"
+        if port in {445, 139, 137, 135}:
+            return "Windows or Samba host"
+        if port == 22:
+            return "Unix-like (SSH)"
+        if port in {548, 62078}:
+            return "Apple (macOS/iOS)"
+        if port in {23, 161}:
+            return "Network appliance"
+        return None
+
+    def _role_hint_from_service(
+        self,
+        service: Optional[str],
+        product: Optional[str],
+        version: Optional[str],
+        extrainfo: Optional[str],
+        port: int,
+    ) -> Optional[str]:
+        tokens = " ".join(
+            [
+                (service or "").lower(),
+                (product or "").lower(),
+                (version or "").lower(),
+                (extrainfo or "").lower(),
+            ]
+        )
+
+        if any(k in tokens for k in ("dnsmasq", "bind", "unbound")) or port == 53:
+            return "dns"
+        if "dhcp" in tokens or port in {67, 68}:
+            return "dhcp"
+        if any(k in tokens for k in ("upnp", "miniupnpd", "igd")) or port == 1900:
+            return "network"
+        if "snmp" in tokens or port == 161:
+            return "network"
+        if any(k in tokens for k in ("printer", "ipp", "cups")):
+            return "printer"
+        if any(k in tokens for k in ("microsoft-ds", "netbios", "smb")) or port in {139, 445}:
+            return "workstation"
+        return None
+
+    def _os_guess_from_service(
+        self,
+        service: Optional[str],
+        product: Optional[str],
+        version: Optional[str],
+        extrainfo: Optional[str],
+    ) -> Optional[str]:
+        tokens = " ".join(
+            [
+                (service or "").lower(),
+                (product or "").lower(),
+                (version or "").lower(),
+                (extrainfo or "").lower(),
+            ]
+        )
+
+        if any(k in tokens for k in ("microsoft", "windows", "winrm", "rdp")):
+            return "Windows"
+        if any(k in tokens for k in ("dropbear", "busybox", "openwrt", "routeros")):
+            return "Network appliance"
+        if any(k in tokens for k in ("ubuntu", "debian", "fedora", "linux", "openssh")):
+            return "Linux"
         return None

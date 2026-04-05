@@ -9,7 +9,12 @@ from typing import Any, Optional
 from backEnd.models.events import host_seen, traffic_seen
 from backEnd.models.types import event_meta, sensor_source, protocol, confidence_level
 from backEnd.utils.logging import get_logger
-from backEnd.utils.net import normalize_ip
+from backEnd.utils.net import (
+    normalize_ip,
+    normalize_mac,
+    detect_interface_ipv4,
+    detect_interface_mac,
+)
 
 
 class passive_listener(threading.Thread):
@@ -25,17 +30,32 @@ class passive_listener(threading.Thread):
       - If neither exists, disable passive capture cleanly
     """
 
-    # Example tcpdump IPv4 line:
-    # IP 192.168.1.10.5353 > 224.0.0.251.5353: UDP, length 123
+    # Match IPv4 flow tuple in both tcpdump formats:
+    # - without -e: "IP 192.168.1.10.5353 > 224.0.0.251.5353: UDP, length 123"
+    # - with -e: "... ethertype IPv4 ..., length 98: 192.168.1.10.5353 > 224.0.0.251.5353: ..."
     _ip_line_re = re.compile(
-        r"\bIP\s+(?P<src_ip>\d+\.\d+\.\d+\.\d+)(?:\.(?P<src_port>\d+))?\s+>\s+"
+        r"(?P<src_ip>\d+\.\d+\.\d+\.\d+)(?:\.(?P<src_port>\d+))?\s+>\s+"
         r"(?P<dst_ip>\d+\.\d+\.\d+\.\d+)(?:\.(?P<dst_port>\d+))?\b"
+    )
+
+    # Example with tcpdump -e:
+    # aa:bb:cc:dd:ee:ff > 11:22:33:44:55:66, ethertype ...
+    _mac_pair_re = re.compile(
+        r"(?P<src_mac>(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2})\s*>\s*"
+        r"(?P<dst_mac>(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2})"
     )
 
     # Example ARP line:
     # ARP, Request who-has 192.168.1.1 tell 192.168.1.10, length 28
     _arp_who_has_re = re.compile(
         r"\bARP.*who-has\s+(?P<target_ip>\d+\.\d+\.\d+\.\d+)\s+tell\s+(?P<src_ip>\d+\.\d+\.\d+\.\d+)\b",
+        re.IGNORECASE,
+    )
+    _arp_reply_re = re.compile(
+        r"\bARP,\s*Reply\s+"
+        r"(?P<src_ip>\d+\.\d+\.\d+\.\d+)\s+is-at\s+"
+        r"(?P<src_mac>(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2})"
+        r"(?:.*\bfor\s+(?P<dst_ip>\d+\.\d+\.\d+\.\d+))?\b",
         re.IGNORECASE,
     )
 
@@ -55,6 +75,19 @@ class passive_listener(threading.Thread):
         self._proc: Optional[subprocess.Popen[str]] = None
         self._capture_backend: Optional[str] = None
         self._last_stderr_line: Optional[str] = None
+        self._local_ip: str | None = None
+        self._local_mac: str | None = None
+
+        iface = getattr(cfg, "interface", None)
+        if iface:
+            try:
+                self._local_ip = detect_interface_ipv4(iface)
+            except Exception:
+                self._local_ip = None
+            try:
+                self._local_mac = detect_interface_mac(iface)
+            except Exception:
+                self._local_mac = None
 
     def run(self) -> None:
         iface = getattr(self._cfg, "interface", None)
@@ -165,6 +198,7 @@ class passive_listener(threading.Thread):
                 tcpdump_path,
                 "-l",   # line-buffered
                 "-n",   # no name resolution
+                "-e",   # include link-layer headers (MAC addresses)
                 "-i", iface,
                 bpf_filter,
             ]
@@ -192,6 +226,11 @@ class passive_listener(threading.Thread):
                 "-e", "arp.src.proto_ipv4",
                 "-e", "arp.dst.proto_ipv4",
                 "-e", "frame.len",
+                "-e", "eth.src",
+                "-e", "eth.dst",
+                "-e", "arp.src.hw_mac",
+                "-e", "arp.dst.hw_mac",
+                "-e", "arp.opcode",
             ]
 
         return None
@@ -222,7 +261,59 @@ class passive_listener(threading.Thread):
             self._log.exception("Failed while reading passive capture stderr")
 
     def _handle_tcpdump_line(self, line: str, iface: str) -> None:
-        # ARP -> host_seen
+        src_mac, dst_mac = self._extract_mac_pair(line)
+
+        # ARP reply -> host_seen (+ ARP traffic edge when destination is known)
+        arp_reply_match = self._arp_reply_re.search(line)
+        if arp_reply_match:
+            try:
+                src_ip = normalize_ip(arp_reply_match.group("src_ip"))
+            except ValueError:
+                src_ip = None
+
+            if src_ip:
+                dst_ip_raw = arp_reply_match.group("dst_ip")
+                inferred_dst_ip: str | None = None
+                if dst_ip_raw:
+                    try:
+                        inferred_dst_ip = normalize_ip(dst_ip_raw)
+                    except ValueError:
+                        inferred_dst_ip = None
+                elif (
+                    self._local_ip
+                    and self._local_mac
+                    and dst_mac
+                    and dst_mac == self._local_mac
+                ):
+                    inferred_dst_ip = self._local_ip
+
+                reply_src_mac = self._normalize_capture_mac(arp_reply_match.group("src_mac")) or src_mac
+
+                meta = event_meta(
+                    source=sensor_source.tcpdump,
+                    iface=iface,
+                    confidence=confidence_level.medium,
+                )
+
+                self._bus.publish(host_seen(meta=meta, ip=src_ip, mac=reply_src_mac))
+
+                if inferred_dst_ip:
+                    self._bus.publish(host_seen(meta=meta, ip=inferred_dst_ip))
+                    packet_bytes = self._extract_length_from_tcpdump(line)
+                    self._bus.publish(
+                        traffic_seen(
+                            meta=meta,
+                            src_ip=src_ip,
+                            dst_ip=inferred_dst_ip,
+                            proto=protocol.arp,
+                            src_port=None,
+                            dst_port=None,
+                            bytes=packet_bytes,
+                        )
+                    )
+                return
+
+        # ARP request -> host_seen(source only)
         arp_match = self._arp_who_has_re.search(line)
         if arp_match:
             try:
@@ -237,8 +328,22 @@ class passive_listener(threading.Thread):
                 confidence=confidence_level.medium,
             )
 
-            self._bus.publish(host_seen(meta=meta, ip=src_ip))
-            self._bus.publish(host_seen(meta=meta, ip=target_ip))
+            self._bus.publish(host_seen(meta=meta, ip=src_ip, mac=src_mac))
+
+            # Emit ARP relationship as traffic so topology edges can appear
+            # for hosts first seen via ARP probes.
+            packet_bytes = self._extract_length_from_tcpdump(line)
+            self._bus.publish(
+                traffic_seen(
+                    meta=meta,
+                    src_ip=src_ip,
+                    dst_ip=target_ip,
+                    proto=protocol.arp,
+                    src_port=None,
+                    dst_port=None,
+                    bytes=packet_bytes,
+                )
+            )
             return
 
         # IPv4 traffic -> traffic_seen
@@ -286,27 +391,52 @@ class passive_listener(threading.Thread):
           7 arp.src.proto_ipv4
           8 arp.dst.proto_ipv4
           9 frame.len
+          10 eth.src
+          11 eth.dst
+          12 arp.src.hw_mac
+          13 arp.dst.hw_mac
+          14 arp.opcode
         """
         parts = line.split("|")
         if len(parts) < 10:
             return
 
-        protocols_field = parts[0].strip()
-        ip_src = parts[1].strip()
-        ip_dst = parts[2].strip()
-        tcp_src = parts[3].strip()
-        tcp_dst = parts[4].strip()
-        udp_src = parts[5].strip()
-        udp_dst = parts[6].strip()
-        arp_src = parts[7].strip()
-        arp_dst = parts[8].strip()
-        frame_len = parts[9].strip()
+        def _part(index: int) -> str:
+            if index >= len(parts):
+                return ""
+            return parts[index].strip()
 
-        # ARP -> host_seen
+        protocols_field = _part(0)
+        ip_src = _part(1)
+        ip_dst = _part(2)
+        tcp_src = _part(3)
+        tcp_dst = _part(4)
+        udp_src = _part(5)
+        udp_dst = _part(6)
+        arp_src = _part(7)
+        arp_dst = _part(8)
+        frame_len = _part(9)
+        eth_src = self._normalize_capture_mac(_part(10))
+        eth_dst = self._normalize_capture_mac(_part(11))
+        arp_src_mac = self._normalize_capture_mac(_part(12))
+        arp_dst_mac = self._normalize_capture_mac(_part(13))
+        arp_opcode = _part(14)
+
+        # ARP -> host_seen (+ optional ARP traffic edge when both endpoints are present)
+        arp_src_ip: str | None = None
+        arp_dst_ip: str | None = None
+        is_arp_reply = (
+            arp_opcode in {"2", "reply"}
+            or (
+                not arp_opcode
+                and self._is_usable_mac(arp_dst_mac or eth_dst)
+            )
+        )
         if arp_src or arp_dst:
             try:
                 if arp_src:
                     src_ip = normalize_ip(arp_src)
+                    arp_src_ip = src_ip
                     self._bus.publish(
                         host_seen(
                             meta=event_meta(
@@ -315,23 +445,71 @@ class passive_listener(threading.Thread):
                                 confidence=confidence_level.medium,
                             ),
                             ip=src_ip,
+                            mac=arp_src_mac or eth_src,
                         )
                     )
 
                 if arp_dst:
                     dst_ip = normalize_ip(arp_dst)
-                    self._bus.publish(
-                        host_seen(
-                            meta=event_meta(
-                                source=sensor_source.tcpdump,
-                                iface=iface,
-                                confidence=confidence_level.medium,
-                            ),
-                            ip=dst_ip,
+                    arp_dst_ip = dst_ip
+                    if is_arp_reply:
+                        self._bus.publish(
+                            host_seen(
+                                meta=event_meta(
+                                    source=sensor_source.tcpdump,
+                                    iface=iface,
+                                    confidence=confidence_level.medium,
+                                ),
+                                ip=dst_ip,
+                                mac=(arp_dst_mac or eth_dst) if self._is_usable_mac(arp_dst_mac or eth_dst) else None,
+                            )
                         )
-                    )
             except ValueError:
                 pass
+
+            if (
+                arp_src_ip
+                and not arp_dst_ip
+                and self._local_ip
+                and self._local_mac
+                and eth_dst
+                and eth_dst == self._local_mac
+            ):
+                arp_dst_ip = self._local_ip
+                self._bus.publish(
+                    host_seen(
+                        meta=event_meta(
+                            source=sensor_source.tcpdump,
+                            iface=iface,
+                            confidence=confidence_level.medium,
+                        ),
+                        ip=arp_dst_ip,
+                    )
+                )
+
+            if arp_src_ip and arp_dst_ip:
+                packet_bytes = 0
+                try:
+                    if frame_len:
+                        packet_bytes = int(frame_len)
+                except Exception:
+                    packet_bytes = 0
+
+                self._bus.publish(
+                    traffic_seen(
+                        meta=event_meta(
+                            source=sensor_source.tcpdump,
+                            iface=iface,
+                            confidence=confidence_level.medium,
+                        ),
+                        src_ip=arp_src_ip,
+                        dst_ip=arp_dst_ip,
+                        proto=protocol.arp,
+                        src_port=None,
+                        dst_port=None,
+                        bytes=packet_bytes,
+                    )
+                )
 
         # IP traffic -> traffic_seen
         if ip_src and ip_dst:
@@ -410,6 +588,33 @@ class passive_listener(threading.Thread):
             return int(match.group("length"))
         except Exception:
             return 0
+
+    def _extract_mac_pair(self, line: str) -> tuple[str | None, str | None]:
+        match = self._mac_pair_re.search(line)
+        if not match:
+            return None, None
+
+        src = self._normalize_capture_mac(match.group("src_mac"))
+        dst = self._normalize_capture_mac(match.group("dst_mac"))
+        return src, dst
+
+    def _normalize_capture_mac(self, value: str | None) -> str | None:
+        if not value:
+            return None
+
+        try:
+            return normalize_mac(value)
+        except Exception:
+            return None
+
+    def _is_usable_mac(self, mac: str | None) -> bool:
+        if not mac:
+            return False
+        if mac == "00:00:00:00:00:00":
+            return False
+        if mac == "ff:ff:ff:ff:ff:ff":
+            return False
+        return True
 
     def _shutdown_proc(self) -> None:
         if not self._proc:

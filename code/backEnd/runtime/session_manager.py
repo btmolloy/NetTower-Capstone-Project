@@ -27,6 +27,9 @@ class SessionManager:
         # mutable runtime values
         self._enable_passive_listener: bool = session_cfg.enable_passive_listener
         self._enable_active_discovery: bool = session_cfg.enable_active_discovery
+        self._allow_all_active_targets: bool = session_cfg.allow_all_active_targets
+        self._enable_icmp_scan: bool = session_cfg.enable_icmp_scan
+        self._enable_nmap_scan: bool = session_cfg.enable_nmap_scan
         self._discovery_interval_seconds: int = session_cfg.discovery_interval_seconds
         self._targeted_scan_cooldown_seconds: int = session_cfg.targeted_scan_cooldown_seconds
         self._discovery_target_cidr: Optional[str] = session_cfg.discovery_target_cidr
@@ -45,6 +48,18 @@ class SessionManager:
     def get_enable_active_discovery(self) -> bool:
         with self._lock:
             return self._enable_active_discovery
+
+    def get_allow_all_active_targets(self) -> bool:
+        with self._lock:
+            return self._allow_all_active_targets
+
+    def get_enable_icmp_scan(self) -> bool:
+        with self._lock:
+            return self._enable_icmp_scan
+
+    def get_enable_nmap_scan(self) -> bool:
+        with self._lock:
+            return self._enable_nmap_scan
 
     def get_discovery_interval_seconds(self) -> int:
         with self._lock:
@@ -69,6 +84,18 @@ class SessionManager:
     def set_enable_active_discovery(self, value: bool) -> None:
         with self._lock:
             self._enable_active_discovery = bool(value)
+
+    def set_allow_all_active_targets(self, value: bool) -> None:
+        with self._lock:
+            self._allow_all_active_targets = bool(value)
+
+    def set_enable_icmp_scan(self, value: bool) -> None:
+        with self._lock:
+            self._enable_icmp_scan = bool(value)
+
+    def set_enable_nmap_scan(self, value: bool) -> None:
+        with self._lock:
+            self._enable_nmap_scan = bool(value)
 
     def set_discovery_interval_seconds(self, value: int) -> None:
         if value <= 0:
@@ -106,6 +133,9 @@ class SessionManager:
                 "interface": self._interface,
                 "enable_passive_listener": self._enable_passive_listener,
                 "enable_active_discovery": self._enable_active_discovery,
+                "allow_all_active_targets": self._allow_all_active_targets,
+                "enable_icmp_scan": self._enable_icmp_scan,
+                "enable_nmap_scan": self._enable_nmap_scan,
                 "discovery_interval_seconds": self._discovery_interval_seconds,
                 "targeted_scan_cooldown_seconds": self._targeted_scan_cooldown_seconds,
                 "discovery_target_cidr": self._discovery_target_cidr,

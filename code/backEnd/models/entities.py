@@ -19,9 +19,13 @@ class host_entity:
 
     ips: set[str] = field(default_factory=set)
     macs: set[str] = field(default_factory=set)
+    hostnames: set[str] = field(default_factory=set)
 
     vendor: Optional[str] = None
     os_guess: Optional[str] = None
+    role: Optional[str] = None
+    role_confidence: Optional[float] = None
+    role_scores: dict[str, float] = field(default_factory=dict)
 
     first_seen: datetime = field(default_factory=utc_now)
     last_seen: datetime = field(default_factory=utc_now)
@@ -29,6 +33,9 @@ class host_entity:
     # Stored as tuples to avoid inconsistent schemas:
     # (proto, port, state) e.g. ("TCP", 22, "open")
     ports: set[tuple[str, int, str]] = field(default_factory=set)
+    # Stored as tuples:
+    # (proto, port, service, product, version, extra)
+    services: set[tuple[str, int, str, str, str, str]] = field(default_factory=set)
 
     def touch(self, ts: Optional[datetime] = None) -> None:
         """
@@ -41,11 +48,24 @@ class host_entity:
             "host_id": self.host_id,
             "ips": sorted(self.ips),
             "macs": sorted(self.macs),
+            "hostnames": sorted(self.hostnames),
             "vendor": self.vendor,
             "os_guess": self.os_guess,
+            "role": self.role,
+            "role_confidence": self.role_confidence,
+            "role_scores": {
+                str(k): float(v)
+                for k, v in sorted(self.role_scores.items())
+            },
             "first_seen": self.first_seen,
             "last_seen": self.last_seen,
             "ports": sorted([(p, int(port), s) for (p, port, s) in self.ports]),
+            "services": sorted(
+                [
+                    (p, int(port), svc, prod, ver, extra)
+                    for (p, port, svc, prod, ver, extra) in self.services
+                ]
+            ),
         }
 
     @staticmethod
@@ -53,11 +73,25 @@ class host_entity:
         h = host_entity(host_id=doc["host_id"])
         h.ips = set(doc.get("ips", []))
         h.macs = set(doc.get("macs", []))
+        h.hostnames = set(doc.get("hostnames", []))
         h.vendor = doc.get("vendor")
         h.os_guess = doc.get("os_guess")
+        h.role = doc.get("role")
+        role_confidence = doc.get("role_confidence")
+        h.role_confidence = float(role_confidence) if isinstance(role_confidence, (int, float)) else None
+        role_scores = doc.get("role_scores", {})
+        if isinstance(role_scores, dict):
+            h.role_scores = {
+                str(k): float(v)
+                for k, v in role_scores.items()
+                if isinstance(v, (int, float))
+            }
+        else:
+            h.role_scores = {}
         h.first_seen = doc.get("first_seen", utc_now())
         h.last_seen = doc.get("last_seen", utc_now())
         h.ports = set(tuple(x) for x in doc.get("ports", []))
+        h.services = set(tuple(x) for x in doc.get("services", []))
         return h
 
 
@@ -78,6 +112,10 @@ class edge_entity:
 
     # Optional: record port pairs involved: (src_port, dst_port)
     ports: set[tuple[Optional[int], Optional[int]]] = field(default_factory=set)
+    relation: str = "traffic"
+    inferred: bool = False
+    confidence: float = 1.0
+    evidence: set[str] = field(default_factory=set)
 
     @staticmethod
     def make_edge_key(a_host_id: str, b_host_id: str, proto: str) -> str:
@@ -104,8 +142,14 @@ class edge_entity:
             "first_seen": self.first_seen,
             "last_seen": self.last_seen,
             "count": int(self.count),
-            "ports": sorted([(sp, dp) for (sp, dp) in self.ports if isinstance(sp, int) and isinstance(dp, int)]),        
-            }
+            "ports": sorted(
+                [(sp, dp) for (sp, dp) in self.ports if isinstance(sp, int) and isinstance(dp, int)]
+            ),
+            "relation": str(self.relation or "traffic"),
+            "inferred": bool(self.inferred),
+            "confidence": float(self.confidence),
+            "evidence": sorted(str(x) for x in self.evidence),
+        }
 
     @staticmethod
     def from_dict(doc: dict[str, Any]) -> "edge_entity":
@@ -118,4 +162,9 @@ class edge_entity:
         e.last_seen = doc.get("last_seen", utc_now())
         e.count = int(doc.get("count", 0))
         e.ports = set(tuple(x) for x in doc.get("ports", []))
+        e.relation = str(doc.get("relation", "traffic"))
+        e.inferred = bool(doc.get("inferred", False))
+        confidence = doc.get("confidence", 1.0)
+        e.confidence = float(confidence) if isinstance(confidence, (int, float)) else 1.0
+        e.evidence = set(str(x) for x in doc.get("evidence", []))
         return e

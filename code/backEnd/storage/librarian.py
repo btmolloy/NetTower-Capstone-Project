@@ -72,10 +72,15 @@ class librarian:
             "$set": {
                 "ips": doc.get("ips", []),
                 "macs": doc.get("macs", []),
+                "hostnames": doc.get("hostnames", []),
                 "vendor": doc.get("vendor"),
                 "os_guess": doc.get("os_guess"),
+                "role": doc.get("role"),
+                "role_confidence": doc.get("role_confidence"),
+                "role_scores": doc.get("role_scores", {}),
                 "last_seen": last_seen,
                 "ports": doc.get("ports", []),
+                "services": doc.get("services", []),
             },
             "$setOnInsert": {
                 "host_id": doc["host_id"],
@@ -99,6 +104,10 @@ class librarian:
                 "last_seen": last_seen,
                 "count": doc.get("count", 0),
                 "ports": doc.get("ports", []),
+                "relation": doc.get("relation", "traffic"),
+                "inferred": doc.get("inferred", False),
+                "confidence": doc.get("confidence", 1.0),
+                "evidence": doc.get("evidence", []),
             },
             "$setOnInsert": {
                 "edge_key": doc["edge_key"],

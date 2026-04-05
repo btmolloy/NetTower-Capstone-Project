@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from typing import Any, List, Optional
 
-from backEnd.models.events import base_event, host_seen, port_seen, traffic_seen
+from backEnd.models.events import (
+    base_event,
+    host_seen,
+    port_seen,
+    traffic_seen,
+    service_seen,
+    os_hint_seen,
+    route_hop_seen,
+)
 from backEnd.models.types import event_meta, sensor_source, protocol, confidence_level
 
 
@@ -84,6 +92,36 @@ class extractor:
                 src_port=(int(data["src_port"]) if data.get("src_port") is not None else None),
                 dst_port=(int(data["dst_port"]) if data.get("dst_port") is not None else None),
                 bytes=int(data.get("bytes", 0)),
+            )
+
+        if event_type == "service_seen":
+            proto_val = str(data.get("proto", "TCP")).strip().upper()
+            proto_enum = protocol.tcp if proto_val == "TCP" else protocol.udp
+            return service_seen(
+                meta=meta,
+                ip=str(data.get("ip", "")).strip(),
+                port=int(data.get("port", 0)),
+                proto=proto_enum,
+                service=(str(data["service"]).strip() if data.get("service") is not None else None),
+                product=(str(data["product"]).strip() if data.get("product") is not None else None),
+                version=(str(data["version"]).strip() if data.get("version") is not None else None),
+                extrainfo=(str(data["extrainfo"]).strip() if data.get("extrainfo") is not None else None),
+            )
+
+        if event_type == "os_hint_seen":
+            return os_hint_seen(
+                meta=meta,
+                ip=str(data.get("ip", "")).strip(),
+                os_name=str(data.get("os_name", "")).strip(),
+                accuracy=int(data.get("accuracy", 0)),
+            )
+
+        if event_type == "route_hop_seen":
+            return route_hop_seen(
+                meta=meta,
+                target_ip=str(data.get("target_ip", "")).strip(),
+                hop_ip=str(data.get("hop_ip", "")).strip(),
+                hop_index=int(data.get("hop_index", 0)),
             )
 
         return None

@@ -4,7 +4,15 @@ Avoid heavy imports or runtime logic here.
 """
 
 from backEnd.models.types import sensor_source, protocol, confidence_level, event_meta
-from backEnd.models.events import base_event, host_seen, port_seen, traffic_seen
+from backEnd.models.events import (
+    base_event,
+    host_seen,
+    port_seen,
+    traffic_seen,
+    service_seen,
+    os_hint_seen,
+    route_hop_seen,
+)
 from backEnd.models.entities import host_entity, edge_entity
 
 __all__ = [
@@ -16,6 +24,9 @@ __all__ = [
     "host_seen",
     "port_seen",
     "traffic_seen",
+    "service_seen",
+    "os_hint_seen",
+    "route_hop_seen",
     "host_entity",
     "edge_entity",
 ]
