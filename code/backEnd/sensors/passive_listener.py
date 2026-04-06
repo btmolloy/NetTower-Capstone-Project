@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 import threading
+import time
 from typing import Any, Optional
 
 from backEnd.models.events import host_seen, traffic_seen
@@ -60,6 +61,26 @@ class passive_listener(threading.Thread):
     )
 
     _length_re = re.compile(r"\blength\s+(?P<length>\d+)\b", re.IGNORECASE)
+    _arp_table_named_line_re = re.compile(
+        r"^\s*(?P<hostname>[^\s]+)\s+\((?P<ip>\d+\.\d+\.\d+\.\d+)\)\s+at\s+"
+        r"(?P<mac>(?:[0-9a-fA-F]{2}[:\-]){5}[0-9a-fA-F]{2})",
+        re.IGNORECASE,
+    )
+    _arp_table_line_re = re.compile(
+        r"\((?P<ip>\d+\.\d+\.\d+\.\d+)\)\s+at\s+"
+        r"(?P<mac>(?:[0-9a-fA-F]{2}[:\-]){5}[0-9a-fA-F]{2})",
+        re.IGNORECASE,
+    )
+    _ip_neigh_line_re = re.compile(
+        r"^(?P<ip>\d+\.\d+\.\d+\.\d+)\s+dev\s+\S+.*\blladdr\s+"
+        r"(?P<mac>(?:[0-9a-fA-F]{2}[:\-]){5}[0-9a-fA-F]{2})\b",
+        re.IGNORECASE,
+    )
+    _windows_arp_line_re = re.compile(
+        r"^\s*(?P<ip>\d+\.\d+\.\d+\.\d+)\s+"
+        r"(?P<mac>(?:[0-9a-fA-F]{2}[\-]){5}[0-9a-fA-F]{2})\s+",
+        re.IGNORECASE,
+    )
 
     def __init__(self, cfg: Any, bus: Any, stop_event: threading.Event) -> None:
         super().__init__(daemon=True)
@@ -77,6 +98,11 @@ class passive_listener(threading.Thread):
         self._last_stderr_line: Optional[str] = None
         self._local_ip: str | None = None
         self._local_mac: str | None = None
+        self._neighbor_last_emit_ts: dict[str, float] = {}
+        self._neighbor_poll_interval_seconds: float = max(
+            5.0,
+            float(getattr(cfg, "passive_neighbor_poll_interval_seconds", 15.0)),
+        )
 
         iface = getattr(cfg, "interface", None)
         if iface:
@@ -127,6 +153,13 @@ class passive_listener(threading.Thread):
             daemon=True,
         )
         stderr_thread.start()
+        neighbor_thread = threading.Thread(
+            target=self._neighbor_poll_loop,
+            args=(iface,),
+            name="passive-listener-neighbor-poll",
+            daemon=True,
+        )
+        neighbor_thread.start()
 
         self._log.info(
             f"passive listener started on iface={iface} "
@@ -180,6 +213,133 @@ class passive_listener(threading.Thread):
                 self._log.info("passive listener stopped")
             else:
                 self._log.warning("passive listener stopped")
+
+    def _neighbor_poll_loop(self, iface: str) -> None:
+        # Poll local ARP/neighbor table to keep passive topology context rich even
+        # when packets are sparse.
+        while not self._stop_event.is_set():
+            try:
+                self._poll_neighbors_once(iface)
+            except Exception:
+                self._log.exception("Neighbor table poll failed")
+            self._stop_event.wait(self._neighbor_poll_interval_seconds)
+
+    def _poll_neighbors_once(self, iface: str) -> None:
+        neighbors = self._iter_arp_neighbors(iface)
+        if not neighbors:
+            return
+
+        now = time.time()
+        for ip, mac, hostname in neighbors:
+            if not ip:
+                continue
+
+            last_emit = self._neighbor_last_emit_ts.get(ip, 0.0)
+            if now - last_emit < 20.0:
+                continue
+            self._neighbor_last_emit_ts[ip] = now
+
+            meta = event_meta(
+                source=sensor_source.arp,
+                iface=iface,
+                confidence=confidence_level.medium,
+            )
+            self._bus.publish(host_seen(meta=meta, ip=ip, mac=mac, hostname=hostname))
+
+            # Emit local<->neighbor ARP relationship to support same-segment inference.
+            if self._local_ip and ip != self._local_ip:
+                self._bus.publish(
+                    traffic_seen(
+                        meta=meta,
+                        src_ip=self._local_ip,
+                        dst_ip=ip,
+                        proto=protocol.arp,
+                        src_port=None,
+                        dst_port=None,
+                        bytes=0,
+                    )
+                )
+
+    def _iter_arp_neighbors(self, iface: str) -> list[tuple[str, str | None, str | None]]:
+        neighbors: dict[str, tuple[str | None, str | None]] = {}
+
+        arp_path = shutil.which("arp")
+        if arp_path:
+            for cmd in (
+                [arp_path, "-an", "-i", iface],
+                [arp_path, "-an"],
+            ):
+                try:
+                    proc = subprocess.run(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.DEVNULL,
+                        text=True,
+                        check=False,
+                    )
+                except Exception:
+                    continue
+
+                for line in (proc.stdout or "").splitlines():
+                    hostname: str | None = None
+                    match = self._arp_table_named_line_re.search(line)
+                    if match:
+                        hostname = self._clean_neighbor_hostname(match.group("hostname"))
+                    else:
+                        match = self._arp_table_line_re.search(line)
+                    if not match:
+                        match = self._windows_arp_line_re.search(line)
+                    if not match:
+                        continue
+                    try:
+                        ip = normalize_ip(match.group("ip"))
+                    except Exception:
+                        continue
+                    mac = self._normalize_capture_mac(match.group("mac"))
+                    existing = neighbors.get(ip)
+                    if existing:
+                        existing_mac, existing_hostname = existing
+                        neighbors[ip] = (
+                            mac or existing_mac,
+                            hostname or existing_hostname,
+                        )
+                    else:
+                        neighbors[ip] = (mac, hostname)
+
+        ip_path = shutil.which("ip")
+        if ip_path:
+            for cmd in (
+                [ip_path, "neigh", "show", "dev", iface],
+                [ip_path, "neigh", "show"],
+            ):
+                try:
+                    proc = subprocess.run(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.DEVNULL,
+                        text=True,
+                        check=False,
+                    )
+                except Exception:
+                    continue
+
+                for line in (proc.stdout or "").splitlines():
+                    match = self._ip_neigh_line_re.search(line.strip())
+                    if not match:
+                        continue
+                    try:
+                        ip = normalize_ip(match.group("ip"))
+                    except Exception:
+                        continue
+                    mac = self._normalize_capture_mac(match.group("mac"))
+                    existing = neighbors.get(ip)
+                    if existing:
+                        _existing_mac, existing_hostname = existing
+                        neighbors[ip] = (mac or _existing_mac, existing_hostname)
+                    else:
+                        neighbors[ip] = (mac, None)
+
+        return [(ip, mac, hostname) for ip, (mac, hostname) in neighbors.items()]
 
     def _build_capture_command(self, iface: str, bpf_filter: str) -> list[str] | None:
         """
@@ -615,6 +775,19 @@ class passive_listener(threading.Thread):
         if mac == "ff:ff:ff:ff:ff:ff":
             return False
         return True
+
+    def _clean_neighbor_hostname(self, value: str | None) -> str | None:
+        if not value:
+            return None
+        text = str(value).strip().strip(".")
+        if not text:
+            return None
+        lowered = text.lower()
+        if lowered in {"?", "(incomplete)", "incomplete", "unknown"}:
+            return None
+        if lowered.replace("-", "").replace(":", "") == "":
+            return None
+        return text[:255]
 
     def _shutdown_proc(self) -> None:
         if not self._proc:

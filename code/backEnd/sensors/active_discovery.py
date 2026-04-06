@@ -22,11 +22,13 @@ from backEnd.models.events import (
 from backEnd.models.types import confidence_level, event_meta, protocol, sensor_source
 from backEnd.utils.logging import get_logger
 from backEnd.utils.net import (
+    is_private_rfc1918_ipv4,
     is_valid_cidr,
     is_valid_ip,
     normalize_cidr,
     normalize_ip,
     normalize_mac,
+    resolve_ip_hostname,
 )
 
 
@@ -35,6 +37,8 @@ _nmap_lookup_lock = Lock()
 _nmap_path_cache: str | None = None
 _nmap_lookup_complete = False
 _nmap_missing_warned = False
+_hostname_lookup_lock = Lock()
+_hostname_by_ip_cache: dict[str, str | None] = {}
 
 _ROLE_PORTS: tuple[int, ...] = (
     22,   # SSH
@@ -217,7 +221,8 @@ def _run_sweep(
 
                 alive_ips.add(ip)
                 mac = _resolve_mac_for_ip(ip)
-                _publish_host_seen(cfg, bus, ip=ip, iface=iface, mac=mac)
+                hostname = _resolve_private_hostname(ip)
+                _publish_host_seen(cfg, bus, ip=ip, iface=iface, mac=mac, hostname=hostname)
 
     if not do_nmap_scan:
         return
@@ -253,6 +258,7 @@ def _run_sweep(
     if max_deep_hosts <= 0:
         return
 
+    max_trace_hosts = max(0, int(getattr(cfg, "active_nmap_max_trace_hosts", 3)))
     deep_candidates: list[nmap_host_observation] = [
         obs for obs in discovery_observations if _is_interesting_host(obs)
     ]
@@ -266,14 +272,15 @@ def _run_sweep(
     )
     deep_candidates = deep_candidates[:max_deep_hosts]
 
-    for obs in deep_candidates:
+    for idx, obs in enumerate(deep_candidates):
+        include_traceroute = idx < max_trace_hosts
         _run_deep_nmap_for_host(
             cfg=cfg,
             bus=bus,
             ip=obs.ip,
             iface=iface,
             known_open_ports=sorted(obs.open_ports()),
-            include_traceroute=False,
+            include_traceroute=include_traceroute,
         )
 
 
@@ -293,7 +300,8 @@ def _run_targeted(
         if ping_alive:
             # For targeted scans, avoid ARP-based MAC enrichment by default to prevent
             # gateway MAC conflation on off-link destinations.
-            _publish_host_seen(cfg, bus, ip=ip, iface=iface, mac=None)
+            hostname = _resolve_private_hostname(ip)
+            _publish_host_seen(cfg, bus, ip=ip, iface=iface, mac=None, hostname=hostname)
 
     if not do_nmap_scan:
         return
@@ -334,6 +342,7 @@ def _publish_host_seen(
     ip: str,
     iface: str | None = None,
     mac: str | None = None,
+    hostname: str | None = None,
 ) -> None:
     if iface is None:
         iface = getattr(cfg, "interface", None)
@@ -343,7 +352,7 @@ def _publish_host_seen(
         iface=iface,
         confidence=confidence_level.high,
     )
-    bus.publish(host_seen(meta=meta, ip=ip, mac=mac))
+    bus.publish(host_seen(meta=meta, ip=ip, mac=mac, hostname=hostname))
 
 
 def _resolve_mac_for_ip(ip: str) -> str | None:
@@ -507,6 +516,8 @@ def _run_deep_nmap_for_host(
             "-Pn",
             "--traceroute",
             "-sn",
+            "--max-retries",
+            "1",
             "--host-timeout",
             trace_timeout,
             "-oX",
@@ -712,13 +723,14 @@ def _publish_nmap_observation(
     )
 
     emitted = False
+    hostname = _clean_optional_text(obs.hostname) or _resolve_private_hostname(obs.ip)
     if obs.status_up or obs.has_strong_life_evidence():
         bus.publish(
             host_seen(
                 meta=meta,
                 ip=obs.ip,
                 mac=obs.mac,
-                hostname=obs.hostname,
+                hostname=hostname,
             )
         )
         emitted = True
@@ -801,6 +813,30 @@ def _is_interesting_host(obs: nmap_host_observation) -> bool:
     return False
 
 
+def _resolve_private_hostname(ip: str) -> str | None:
+    try:
+        norm_ip = normalize_ip(ip)
+    except Exception:
+        return None
+
+    if not is_private_rfc1918_ipv4(norm_ip):
+        return None
+
+    with _hostname_lookup_lock:
+        cached = _hostname_by_ip_cache.get(norm_ip)
+    if cached:
+        return cached
+
+    resolved = resolve_ip_hostname(norm_ip, timeout_seconds=1.2)
+    cleaned = _clean_optional_text(resolved)
+
+    if cleaned:
+        with _hostname_lookup_lock:
+            _hostname_by_ip_cache[norm_ip] = cleaned
+
+    return cleaned
+
+
 def _resolve_nmap_toggle(cfg: Any, explicit_value: bool | None) -> bool:
     if explicit_value is not None:
         return bool(explicit_value)
@@ -853,4 +889,3 @@ def _clean_optional_text(value: Any) -> str | None:
     if not text:
         return None
     return text
-

@@ -3,6 +3,7 @@ const canvasEmpty = document.getElementById("canvas-empty");
 const stopButton = document.getElementById("stop-session-btn");
 const modeButton = document.getElementById("map-mode-btn");
 const hostFilterButton = document.getElementById("host-filter-btn");
+const topologyLayoutButton = document.getElementById("topology-layout-btn");
 const zoomSlider = document.getElementById("zoom-slider");
 const zoomSliderFill = document.getElementById("zoom-slider-fill");
 const settingsButton = document.getElementById("settings-btn");
@@ -55,6 +56,11 @@ const HOST_FILTER_LABELS = {
   public: "Public",
   private: "Private",
 };
+const TOPOLOGY_LAYOUT_ORDER = ["tree", "star"];
+const TOPOLOGY_LAYOUT_LABELS = {
+  tree: "Tree",
+  star: "Star",
+};
 const DEFAULT_ZOOM_PERCENT = 33;
 const CAMERA_ZOOM_MIN_DISTANCE = 420;
 const CAMERA_ZOOM_DEFAULT_DISTANCE = 900;
@@ -68,6 +74,9 @@ const state = {
   selectedHostId: null,
   selectedHost: null,
   hostFilter: "all",
+  topologyLayoutMode: "tree",
+  treeGatewayId: null,
+  treeExternalNodeIds: new Set(),
   zoomPercent: DEFAULT_ZOOM_PERCENT,
   localIdentity: {
     interface: null,
@@ -105,6 +114,16 @@ const state = {
     pointerId: null,
     lastX: 0,
     lastY: 0,
+    lastDragAt: 0,
+  },
+  view2d: {
+    offsetX: 0,
+    offsetY: 0,
+    dragging: false,
+    pointerId: null,
+    lastX: 0,
+    lastY: 0,
+    dragDistance: 0,
     lastDragAt: 0,
   },
 };
@@ -292,6 +311,542 @@ function hostShouldRender(host) {
   return hostMatchesFilter(host) && hostPassesStaleVisibility(host);
 }
 
+function primaryHostIp(host) {
+  const ips = Array.isArray(host?.ips) ? host.ips : [];
+  for (const ip of ips) {
+    if (isPrivateIPv4(ip) || isPublicIPv4(ip)) {
+      return String(ip);
+    }
+  }
+  return ips.length > 0 ? String(ips[0]) : null;
+}
+
+function stableUnitFromString(value) {
+  const text = String(value || "");
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967295;
+}
+
+function canonicalNodeRole(host) {
+  const explicit = String(host?.node_role || "").trim().toLowerCase();
+  if (["router", "gateway"].includes(explicit)) {
+    return "router";
+  }
+  if (["switch", "network"].includes(explicit)) {
+    return "switch";
+  }
+  if (explicit === "server") {
+    return "server";
+  }
+  if (["workstation", "client"].includes(explicit)) {
+    return "workstation";
+  }
+  if (explicit === "unknown") {
+    return "unknown";
+  }
+
+  const role = String(host?.role || "").trim().toLowerCase();
+  if (["router", "gateway", "network", "dns", "dhcp", "switch", "firewall"].includes(role)) {
+    return "router";
+  }
+  if (["server", "storage", "nas"].includes(role)) {
+    return "server";
+  }
+  if (["workstation", "client", "printer", "iot"].includes(role)) {
+    return "workstation";
+  }
+  return "unknown";
+}
+
+function nodeSortScore(node) {
+  const host = node.host || {};
+  const role = canonicalNodeRole(host);
+  const roleOrder = {
+    router: 0,
+    switch: 1,
+    server: 2,
+    workstation: 3,
+    unknown: 4,
+  };
+  const ip = primaryHostIp(host) || "";
+  const roleBias = roleOrder[role] ?? 5;
+  return `${String(roleBias).padStart(2, "0")}|${ip}|${host.host_id}`;
+}
+
+function edgeRelationship(edge) {
+  const rel = String(edge?.relationship_type || edge?.relation || "observed-traffic-peer")
+    .trim()
+    .toLowerCase();
+  if (rel === "route_hop" || rel === "route-hop") {
+    return "routed-to";
+  }
+  if (rel === "traffic") {
+    return "observed-traffic-peer";
+  }
+  return rel;
+}
+
+function isPublicNodeId(hostId) {
+  const node = state.nodes.get(hostId);
+  if (!node || !node.host) {
+    return false;
+  }
+  if (node.host.is_external === true) {
+    return true;
+  }
+  const ip = primaryHostIp(node.host);
+  return ip ? isPublicIPv4(ip) : false;
+}
+
+function mergeRenderableEdge(edgeMap, edge) {
+  const a = String(edge.a_host_id || "");
+  const b = String(edge.b_host_id || "");
+  if (!a || !b || a === b) {
+    return;
+  }
+  const left = a < b ? a : b;
+  const right = a < b ? b : a;
+  const key = `${left}__${right}`;
+  const relation = String(edge.relationship_type || edge.relation || "observed-traffic-peer");
+  const confidence = Number.isFinite(Number(edge.confidence)) ? Number(edge.confidence) : 1;
+  const count = Number.isFinite(Number(edge.count)) ? Number(edge.count) : 0;
+
+  if (!edgeMap.has(key)) {
+    edgeMap.set(key, {
+      ...edge,
+      a_host_id: left,
+      b_host_id: right,
+      relation,
+      relationship_type: relation,
+      confidence,
+      count,
+      evidence: Array.isArray(edge.evidence) ? [...edge.evidence] : [],
+      ports: Array.isArray(edge.ports) ? [...edge.ports] : [],
+    });
+    return;
+  }
+
+  const existing = edgeMap.get(key);
+  existing.count += count;
+  existing.confidence = Math.max(Number(existing.confidence) || 0, confidence);
+
+  const existingLast = parseTimestamp(existing.last_seen);
+  const candidateLast = parseTimestamp(edge.last_seen);
+  if (!existingLast || candidateLast > existingLast) {
+    existing.last_seen = edge.last_seen || existing.last_seen;
+  }
+
+  const existingFirst = parseTimestamp(existing.first_seen);
+  const candidateFirst = parseTimestamp(edge.first_seen);
+  if (!existingFirst || (candidateFirst && candidateFirst < existingFirst)) {
+    existing.first_seen = edge.first_seen || existing.first_seen;
+  }
+
+  const existingRelation = edgeRelationship(existing);
+  const candidateRelation = edgeRelationship(edge);
+  if (candidateRelation === "upstream/external" && existingRelation !== "upstream/external") {
+    existing.relation = "upstream/external";
+    existing.relationship_type = "upstream/external";
+  }
+}
+
+function treeRoutedEdges(edges) {
+  const gatewayId = state.treeGatewayId;
+  if (!gatewayId || !state.nodes.has(gatewayId) || !Array.isArray(edges) || edges.length === 0) {
+    return edges;
+  }
+
+  const edgeMap = new Map();
+  for (const edge of edges) {
+    const aPublic = isPublicNodeId(edge.a_host_id);
+    const bPublic = isPublicNodeId(edge.b_host_id);
+
+    if (aPublic === bPublic) {
+      mergeRenderableEdge(edgeMap, edge);
+      continue;
+    }
+
+    const publicId = aPublic ? edge.a_host_id : edge.b_host_id;
+    const internalId = aPublic ? edge.b_host_id : edge.a_host_id;
+
+    if (!publicId || !internalId) {
+      mergeRenderableEdge(edgeMap, edge);
+      continue;
+    }
+
+    if (internalId === gatewayId) {
+      mergeRenderableEdge(edgeMap, {
+        ...edge,
+        relation: "upstream/external",
+        relationship_type: "upstream/external",
+      });
+      continue;
+    }
+
+    mergeRenderableEdge(edgeMap, {
+      ...edge,
+      a_host_id: gatewayId,
+      b_host_id: publicId,
+      relation: "upstream/external",
+      relationship_type: "upstream/external",
+      inferred: true,
+      confidence: Math.max(0.62, Number(edge.confidence) || 0),
+      evidence: [...(Array.isArray(edge.evidence) ? edge.evidence : []), "tree-gateway-route"],
+    });
+  }
+
+  return [...edgeMap.values()];
+}
+
+function buildTreeLayoutTargets(nodes, edges, width, height) {
+  const targets = new Map();
+  if (!Array.isArray(nodes) || nodes.length === 0) {
+    state.treeGatewayId = null;
+    state.treeExternalNodeIds = new Set();
+    return targets;
+  }
+
+  const nodeById = new Map(nodes.map((node) => [node.host.host_id, node]));
+  const ids = nodes.map((node) => node.host.host_id);
+  const externalIds = ids.filter((id) => {
+    const ip = primaryHostIp(nodeById.get(id)?.host);
+    const explicitExternal = nodeById.get(id)?.host?.is_external === true;
+    return explicitExternal || (ip ? isPublicIPv4(ip) : false);
+  });
+  const externalIdSet = new Set(externalIds);
+  state.treeExternalNodeIds = new Set(externalIds);
+  const internalIds = ids.filter((id) => !externalIdSet.has(id));
+  const routerIds = ids.filter((id) => {
+    if (externalIdSet.has(id)) {
+      return false;
+    }
+    const role = canonicalNodeRole(nodeById.get(id)?.host);
+    return role === "router" || role === "switch";
+  });
+
+  const localNode = nodes.find((node) => isLocalHost(node.host)) || null;
+  const localNodeId = localNode ? localNode.host.host_id : null;
+
+  let gatewayId = null;
+  if (localNodeId) {
+    const candidates = edges
+      .filter((edge) => {
+        const rel = edgeRelationship(edge);
+        return rel === "gateway-for" || rel === "routed-to" || rel === "same-segment-peer";
+      })
+      .map((edge) => (edge.a_host_id === localNodeId ? edge.b_host_id : edge.a_host_id))
+      .filter((id) => id && id !== localNodeId && routerIds.includes(id));
+    if (candidates.length > 0) {
+      candidates.sort((left, right) => {
+        const leftNode = nodeById.get(left);
+        const rightNode = nodeById.get(right);
+        const leftScore = (leftNode?.degree || 0) + (leftNode?.host?.node_role_confidence || 0);
+        const rightScore = (rightNode?.degree || 0) + (rightNode?.host?.node_role_confidence || 0);
+        return rightScore - leftScore;
+      });
+      gatewayId = candidates[0];
+    }
+  }
+  if (!gatewayId && routerIds.length > 0) {
+    const rankedRouters = routerIds.slice().sort((left, right) => {
+      const leftNode = nodeById.get(left);
+      const rightNode = nodeById.get(right);
+      const leftPrivate = isPrivateIPv4(primaryHostIp(leftNode?.host) || "");
+      const rightPrivate = isPrivateIPv4(primaryHostIp(rightNode?.host) || "");
+      const leftScore = (leftNode?.degree || 0) + (leftNode?.host?.node_role_confidence || 0) + (leftPrivate ? 0.5 : 0);
+      const rightScore = (rightNode?.degree || 0) + (rightNode?.host?.node_role_confidence || 0) + (rightPrivate ? 0.5 : 0);
+      return rightScore - leftScore;
+    });
+    gatewayId = rankedRouters[0] || null;
+  }
+  state.treeGatewayId = gatewayId;
+
+  const parentById = new Map();
+  for (const id of internalIds) {
+    const host = nodeById.get(id)?.host;
+    const candidate = host?.parent_candidate ? String(host.parent_candidate) : null;
+    if (candidate && candidate !== id && nodeById.has(candidate) && !externalIdSet.has(candidate)) {
+      parentById.set(id, candidate);
+    }
+  }
+
+  for (const id of internalIds) {
+    if (parentById.has(id)) {
+      continue;
+    }
+
+    const node = nodeById.get(id);
+    if (!node) {
+      continue;
+    }
+    const host = node.host;
+    const ip = primaryHostIp(host);
+    const isPublic = ip ? isPublicIPv4(ip) : false;
+    const role = canonicalNodeRole(host);
+
+    if (isPublic) {
+      continue;
+    }
+
+    if (id === gatewayId) {
+      continue;
+    }
+
+    if ((role === "router" || role === "switch") && gatewayId && gatewayId !== id) {
+      parentById.set(id, gatewayId);
+      continue;
+    }
+
+    if (gatewayId && gatewayId !== id) {
+      parentById.set(id, gatewayId);
+    }
+  }
+
+  // Break accidental cycles conservatively.
+  for (const id of internalIds) {
+    let current = id;
+    const seen = new Set([id]);
+    while (parentById.has(current)) {
+      const parent = parentById.get(current);
+      if (!parent || !nodeById.has(parent) || externalIdSet.has(parent)) {
+        break;
+      }
+      if (seen.has(parent)) {
+        parentById.delete(current);
+        break;
+      }
+      seen.add(parent);
+      current = parent;
+    }
+  }
+
+  const layerById = new Map();
+  const computeLayer = (id, stack = new Set()) => {
+    if (layerById.has(id)) {
+      return layerById.get(id);
+    }
+    if (stack.has(id)) {
+      layerById.set(id, 3);
+      return 3;
+    }
+    stack.add(id);
+
+    const host = nodeById.get(id)?.host;
+    const explicitLayer = Number.isInteger(host?.topology_layer) ? Number(host.topology_layer) : null;
+    const parentId = parentById.get(id);
+    let layer = 0;
+    if (parentId && nodeById.has(parentId) && !externalIdSet.has(parentId)) {
+      layer = computeLayer(parentId, stack) + 1;
+    } else {
+      const ip = primaryHostIp(host);
+      if (ip && isPublicIPv4(ip)) {
+        layer = 0;
+      } else if (id === gatewayId) {
+        layer = 1;
+      } else if (canonicalNodeRole(host) === "router" || canonicalNodeRole(host) === "switch") {
+        layer = 2;
+      } else {
+        layer = 3;
+      }
+    }
+    if (Number.isInteger(explicitLayer)) {
+      layer = Math.max(layer, explicitLayer);
+    }
+    layerById.set(id, layer);
+    stack.delete(id);
+    return layer;
+  };
+  for (const id of internalIds) {
+    computeLayer(id);
+  }
+  for (const id of externalIds) {
+    layerById.set(id, 0);
+  }
+
+  const childrenById = new Map(internalIds.map((id) => [id, []]));
+  for (const [childId, parentId] of parentById.entries()) {
+    if (externalIdSet.has(childId) || externalIdSet.has(parentId)) {
+      continue;
+    }
+    if (!childrenById.has(parentId)) {
+      childrenById.set(parentId, []);
+    }
+    childrenById.get(parentId).push(childId);
+  }
+  for (const [parentId, childIds] of childrenById.entries()) {
+    childIds.sort((left, right) => {
+      const leftNode = nodeById.get(left);
+      const rightNode = nodeById.get(right);
+      return nodeSortScore(leftNode).localeCompare(nodeSortScore(rightNode));
+    });
+    childrenById.set(parentId, childIds);
+  }
+
+  const roots = internalIds.filter((id) => !parentById.has(id) || externalIdSet.has(parentById.get(id)));
+  if (roots.length === 0 && internalIds.length > 0) {
+    if (gatewayId && internalIds.includes(gatewayId)) {
+      roots.push(gatewayId);
+    } else {
+      roots.push(internalIds[0]);
+    }
+  }
+  roots.sort((left, right) => {
+    const leftLayer = layerById.get(left) ?? 99;
+    const rightLayer = layerById.get(right) ?? 99;
+    if (leftLayer !== rightLayer) {
+      return leftLayer - rightLayer;
+    }
+    return nodeSortScore(nodeById.get(left)).localeCompare(nodeSortScore(nodeById.get(right)));
+  });
+
+  const leafCountCache = new Map();
+  const leafCount = (id) => {
+    if (leafCountCache.has(id)) {
+      return leafCountCache.get(id);
+    }
+    const children = childrenById.get(id) || [];
+    if (children.length === 0) {
+      leafCountCache.set(id, 1);
+      return 1;
+    }
+    let total = 0;
+    for (const child of children) {
+      total += leafCount(child);
+    }
+    const safeTotal = Math.max(1, total);
+    leafCountCache.set(id, safeTotal);
+    return safeTotal;
+  };
+
+  const totalLeaves = Math.max(1, roots.reduce((sum, id) => sum + leafCount(id), 0));
+  const leftPadding = Math.max(72, width * 0.07);
+  const rightPadding = Math.max(72, width * 0.07);
+  const topPadding = Math.max(62, height * 0.1);
+  const bottomPadding = Math.max(68, height * 0.1);
+  const usableWidth = Math.max(1, width - leftPadding - rightPadding);
+  const maxLayer = Math.max(1, ...internalIds.map((id) => layerById.get(id) ?? 1));
+  const layerGap = Math.max(64, (height - topPadding - bottomPadding) / Math.max(1, maxLayer));
+  const leafStep = usableWidth / totalLeaves;
+  let leafCursor = 0;
+
+  const yForLayer = (layer) => topPadding + clamp(layer, 0, maxLayer + 1) * layerGap;
+
+  const placeSubtree = (id) => {
+    const children = childrenById.get(id) || [];
+    let x = leftPadding + (leafCursor + 0.5) * leafStep;
+    if (children.length === 0) {
+      leafCursor += 1;
+    } else {
+      const childXs = children.map((childId) => placeSubtree(childId));
+      x = childXs.reduce((sum, value) => sum + value, 0) / childXs.length;
+    }
+
+    targets.set(id, {
+      x,
+      y: yForLayer(layerById.get(id) ?? 0),
+    });
+    return x;
+  };
+
+  for (const rootId of roots) {
+    placeSubtree(rootId);
+  }
+
+  for (const id of internalIds) {
+    if (targets.has(id)) {
+      continue;
+    }
+    targets.set(id, {
+      x: leftPadding + (stableUnitFromString(id) * usableWidth),
+      y: yForLayer(layerById.get(id) ?? (maxLayer + 1)),
+    });
+  }
+
+  // Place external/public nodes in a wide adaptive top region. This reflows
+  // as public-host count changes so nodes can spread out and reduce overlap.
+  const gatewayTarget = gatewayId && targets.has(gatewayId) ? targets.get(gatewayId) : null;
+  const blobCenterX = gatewayTarget ? gatewayTarget.x : width / 2;
+
+  const sortedExternalIds = externalIds
+    .slice()
+    .sort((left, right) => stableUnitFromString(left) - stableUnitFromString(right));
+
+  if (sortedExternalIds.length > 0) {
+    const count = sortedExternalIds.length;
+    const bandTop = 14;
+    const bandBottom = clamp(
+      Math.min(height * 0.42, Math.max(yForLayer(1) - 34, bandTop + 120)),
+      bandTop + 72,
+      Math.max(bandTop + 72, height - 90),
+    );
+    const bandLeft = leftPadding;
+    const bandRight = width - rightPadding;
+    const blobCenterY = (bandTop + bandBottom) * 0.5;
+    const radiusX = Math.max(110, (bandRight - bandLeft) * 0.47);
+    const radiusY = Math.max(46, (bandBottom - bandTop) * 0.48);
+    const centerX = clamp(blobCenterX, bandLeft + 32, bandRight - 32);
+    const area = Math.PI * radiusX * radiusY;
+    const minGap = clamp(Math.sqrt(area / Math.max(1, count)) * 0.72, 26, 62);
+    const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+
+    const points = sortedExternalIds.map((id, index) => {
+      const t = (index + 0.5) / count;
+      const radial = Math.sqrt(t);
+      const theta = index * goldenAngle;
+      return {
+        id,
+        x: centerX + Math.cos(theta) * radial * radiusX,
+        y: blobCenterY + Math.sin(theta) * radial * radiusY,
+      };
+    });
+
+    // Lightweight relax pass to spread nodes apart and reduce overlap.
+    for (let iter = 0; iter < 20; iter += 1) {
+      for (let i = 0; i < points.length; i += 1) {
+        for (let j = i + 1; j < points.length; j += 1) {
+          const a = points[i];
+          const b = points[j];
+          const dx = a.x - b.x;
+          const dy = a.y - b.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
+          if (dist >= minGap) {
+            continue;
+          }
+          const push = (minGap - dist) * 0.5;
+          const ux = dx / dist;
+          const uy = dy / dist;
+          a.x += ux * push;
+          b.x -= ux * push;
+          a.y += uy * push;
+          b.y -= uy * push;
+        }
+      }
+
+      for (const point of points) {
+        const ex = (point.x - centerX) / radiusX;
+        const ey = (point.y - blobCenterY) / radiusY;
+        const er = Math.sqrt(ex * ex + ey * ey);
+        if (er > 1) {
+          point.x = centerX + (ex / er) * radiusX;
+          point.y = blobCenterY + (ey / er) * radiusY;
+        }
+        point.x = clamp(point.x, bandLeft, bandRight);
+        point.y = clamp(point.y, bandTop, bandBottom);
+      }
+    }
+
+    for (const point of points) {
+      targets.set(point.id, { x: point.x, y: point.y });
+    }
+  }
+
+  return targets;
+}
+
 function zoomPercentToScale(percent) {
   const p = clamp(percent, 0, 100);
   if (p >= DEFAULT_ZOOM_PERCENT) {
@@ -362,6 +917,20 @@ function applyScreenZoom(projected) {
   };
 }
 
+function apply2DPan(projected) {
+  if (!projected) {
+    return null;
+  }
+  if (state.mode !== "2d") {
+    return projected;
+  }
+  return {
+    ...projected,
+    x: projected.x + state.view2d.offsetX,
+    y: projected.y + state.view2d.offsetY,
+  };
+}
+
 function setStatus(message, level = "info") {
   mainStatusElement.textContent = message;
   mainStatusElement.classList.remove("status-info", "status-success", "status-error");
@@ -375,7 +944,7 @@ function setStopping(isStopping) {
 
 function modeCaption() {
   if (state.mode === "2d") {
-    return "2D mode shows active topology layout optimized for analysis.";
+    return "2D mode shows active topology layout optimized for analysis. Drag to pan.";
   }
   if (state.mode === "3d") {
     return "3D mode: drag to orbit, Shift-drag or right-drag to pan, scroll to zoom.";
@@ -390,6 +959,10 @@ function updateModeLabel() {
 
 function updateHostFilterLabel() {
   hostFilterButton.textContent = `Hosts: ${HOST_FILTER_LABELS[state.hostFilter]}`;
+}
+
+function updateTopologyLayoutLabel() {
+  topologyLayoutButton.textContent = `Topology: ${TOPOLOGY_LAYOUT_LABELS[state.topologyLayoutMode]}`;
 }
 
 function updateBackdrop() {
@@ -597,7 +1170,12 @@ function renderTopologyTextList(snapshot) {
       lines.push(`   IPs: ${formatSimpleList(host.ips)}`);
       lines.push(`   MACs: ${formatSimpleList(host.macs)}`);
       const roleLabel = host.role ? `${host.role} (${Math.round((host.role_confidence || 0) * 100)}%)` : "Unknown";
-      lines.push(`   Vendor: ${host.vendor || "Unknown"} | OS: ${host.os_guess || "Unknown"} | Role: ${roleLabel}`);
+      const nodeRoleLabel = host.node_role
+        ? `${host.node_role} (${Math.round((host.node_role_confidence || 0) * 100)}%)`
+        : "Unknown";
+      lines.push(`   Vendor: ${host.vendor || "Unknown"} | OS: ${host.os_guess || "Unknown"}`);
+      lines.push(`   Detailed Role: ${roleLabel} | Topology Role: ${nodeRoleLabel}`);
+      lines.push(`   Parent: ${host.parent_candidate || "None"} (${Number.isFinite(host.parent_confidence) ? `${Math.round(host.parent_confidence * 100)}%` : "n/a"}) | Layer: ${Number.isInteger(host.topology_layer) ? host.topology_layer : "n/a"}`);
       lines.push(`   First Seen: ${formatTime(host.first_seen)}`);
       lines.push(`   Last Seen: ${formatTime(host.last_seen)} (${formatAgeText(host.last_seen)})`);
       lines.push("");
@@ -610,7 +1188,7 @@ function renderTopologyTextList(snapshot) {
   } else {
     sortedEdges.forEach((edge, index) => {
       const proto = edge.proto || "unknown";
-      const relation = edge.relation || "traffic";
+      const relation = edge.relationship_type || edge.relation || "observed-traffic-peer";
       const confidenceText = Number.isFinite(edge.confidence) ? `${Math.round(edge.confidence * 100)}%` : "n/a";
       lines.push(`${index + 1}. ${edge.a_host_id} <-> ${edge.b_host_id}`);
       lines.push(`   Proto: ${proto} | Relation: ${relation} | Confidence: ${confidenceText} | Count: ${edge.count} | Last Seen: ${formatAgeText(edge.last_seen)}`);
@@ -630,8 +1208,13 @@ function renderHostDetails(host) {
     <div class="detail-row"><span>Hostnames</span><strong>${formatArray(host.hostnames)}</strong></div>
     <div class="detail-row"><span>Vendor</span><strong>${escapeHtml(host.vendor || "Unknown")}</strong></div>
     <div class="detail-row"><span>OS Guess</span><strong>${escapeHtml(host.os_guess || "Unknown")}</strong></div>
-    <div class="detail-row"><span>Role</span><strong>${escapeHtml(host.role || "Unknown")}</strong></div>
-    <div class="detail-row"><span>Role Confidence</span><strong>${Number.isFinite(host.role_confidence) ? `${Math.round(host.role_confidence * 100)}%` : "Unknown"}</strong></div>
+    <div class="detail-row"><span>Detailed Role</span><strong>${escapeHtml(host.role || "Unknown")}</strong></div>
+    <div class="detail-row"><span>Detailed Role Confidence</span><strong>${Number.isFinite(host.role_confidence) ? `${Math.round(host.role_confidence * 100)}%` : "Unknown"}</strong></div>
+    <div class="detail-row"><span>Topology Role</span><strong>${escapeHtml(host.node_role || "Unknown")}</strong></div>
+    <div class="detail-row"><span>Topology Role Confidence</span><strong>${Number.isFinite(host.node_role_confidence) ? `${Math.round(host.node_role_confidence * 100)}%` : "Unknown"}</strong></div>
+    <div class="detail-row"><span>Parent Candidate</span><strong>${escapeHtml(host.parent_candidate || "None")}</strong></div>
+    <div class="detail-row"><span>Parent Confidence</span><strong>${Number.isFinite(host.parent_confidence) ? `${Math.round(host.parent_confidence * 100)}%` : "Unknown"}</strong></div>
+    <div class="detail-row"><span>Topology Layer</span><strong>${Number.isInteger(host.topology_layer) ? host.topology_layer : "Unknown"}</strong></div>
     <div class="detail-row"><span>First Seen</span><strong>${escapeHtml(formatTime(host.first_seen))}</strong></div>
     <div class="detail-row"><span>Last Seen</span><strong>${escapeHtml(formatTime(host.last_seen))}</strong></div>
     <div class="detail-row"><span>Ports</span><strong>${formatPorts(host.ports)}</strong></div>
@@ -685,6 +1268,14 @@ function normalizeHost(raw) {
     role: raw.role ? String(raw.role) : null,
     role_confidence: Number.isFinite(Number(raw.role_confidence)) ? Number(raw.role_confidence) : null,
     role_scores: raw.role_scores && typeof raw.role_scores === "object" ? raw.role_scores : {},
+    node_role: raw.node_role ? String(raw.node_role) : null,
+    node_role_confidence: Number.isFinite(Number(raw.node_role_confidence))
+      ? Number(raw.node_role_confidence)
+      : null,
+    parent_candidate: raw.parent_candidate ? String(raw.parent_candidate) : null,
+    parent_confidence: Number.isFinite(Number(raw.parent_confidence)) ? Number(raw.parent_confidence) : null,
+    topology_layer: Number.isInteger(Number(raw.topology_layer)) ? Number(raw.topology_layer) : null,
+    is_external: typeof raw.is_external === "boolean" ? raw.is_external : null,
     first_seen: raw.first_seen ? String(raw.first_seen) : null,
     last_seen: raw.last_seen ? String(raw.last_seen) : null,
     ports: Array.isArray(raw.ports) ? raw.ports : [],
@@ -698,7 +1289,10 @@ function normalizeEdge(raw) {
     a_host_id: String(raw.a_host_id || ""),
     b_host_id: String(raw.b_host_id || ""),
     proto: raw.proto ? String(raw.proto) : "",
-    relation: raw.relation ? String(raw.relation) : "traffic",
+    relation: raw.relationship_type
+      ? String(raw.relationship_type)
+      : (raw.relation ? String(raw.relation) : "observed-traffic-peer"),
+    relationship_type: raw.relationship_type ? String(raw.relationship_type) : null,
     inferred: Boolean(raw.inferred),
     confidence: Number.isFinite(Number(raw.confidence)) ? Number(raw.confidence) : 1,
     evidence: Array.isArray(raw.evidence) ? raw.evidence : [],
@@ -718,9 +1312,17 @@ function applySnapshot(snapshot) {
   const visibleHosts = validHosts.filter((host) => hostShouldRender(host));
   const allHostIds = new Set(validHosts.map((host) => host.host_id));
   const visibleNodeIds = new Set(visibleHosts.map((host) => host.host_id));
+  const centerX = state.width / 2;
+  const centerY = state.height / 2;
 
   for (const host of visibleHosts) {
-    ensureNode(host);
+    const node = ensureNode(host);
+    if (isLocalHost(host)) {
+      node.x = centerX;
+      node.y = centerY;
+      node.vx *= 0.35;
+      node.vy *= 0.35;
+    }
   }
 
   for (const existingId of [...state.nodes.keys()]) {
@@ -1136,16 +1738,117 @@ function drawCube(world, size, height, baseColor, selected) {
   };
 }
 
+function drawNodeRoleGlyph2D(host, x, y, radius) {
+  const drawRoundedRect = (rx, ry, rw, rh, rr) => {
+    if (typeof ctx.roundRect === "function") {
+      ctx.roundRect(rx, ry, rw, rh, rr);
+      return;
+    }
+    const r = Math.min(rr, rw / 2, rh / 2);
+    ctx.moveTo(rx + r, ry);
+    ctx.lineTo(rx + rw - r, ry);
+    ctx.quadraticCurveTo(rx + rw, ry, rx + rw, ry + r);
+    ctx.lineTo(rx + rw, ry + rh - r);
+    ctx.quadraticCurveTo(rx + rw, ry + rh, rx + rw - r, ry + rh);
+    ctx.lineTo(rx + r, ry + rh);
+    ctx.quadraticCurveTo(rx, ry + rh, rx, ry + rh - r);
+    ctx.lineTo(rx, ry + r);
+    ctx.quadraticCurveTo(rx, ry, rx + r, ry);
+  };
+
+  const role = canonicalNodeRole(host);
+  const glyphColor = "rgba(243, 248, 255, 0.94)";
+  const strokeColor = "rgba(10, 12, 18, 0.65)";
+  const s = Math.max(6, radius * 0.7);
+
+  ctx.save();
+  ctx.strokeStyle = strokeColor;
+  ctx.fillStyle = glyphColor;
+  ctx.lineWidth = Math.max(1.2, radius * 0.13);
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  if (role === "router") {
+    ctx.beginPath();
+    ctx.arc(x, y, s * 0.62, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x - s * 0.95, y);
+    ctx.lineTo(x - s * 0.5, y);
+    ctx.moveTo(x + s * 0.5, y);
+    ctx.lineTo(x + s * 0.95, y);
+    ctx.moveTo(x, y - s * 0.95);
+    ctx.lineTo(x, y - s * 0.5);
+    ctx.moveTo(x, y + s * 0.5);
+    ctx.lineTo(x, y + s * 0.95);
+    ctx.stroke();
+  } else if (role === "switch") {
+    const w = s * 1.55;
+    const h = s * 0.92;
+    const rx = x - w / 2;
+    const ry = y - h / 2;
+    ctx.beginPath();
+    drawRoundedRect(rx, ry, w, h, Math.max(2, h * 0.2));
+    ctx.stroke();
+    const portCount = 4;
+    for (let i = 0; i < portCount; i += 1) {
+      const px = rx + (w * (i + 1)) / (portCount + 1);
+      const py = ry + h * 0.62;
+      ctx.beginPath();
+      ctx.arc(px, py, Math.max(1.1, s * 0.08), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (role === "server") {
+    const w = s * 1.2;
+    const h = s * 0.42;
+    for (let i = 0; i < 3; i += 1) {
+      const ry = y - h * 1.35 + i * h * 1.35;
+      ctx.beginPath();
+      drawRoundedRect(x - w / 2, ry, w, h, Math.max(2, h * 0.25));
+      ctx.stroke();
+    }
+  } else if (role === "workstation") {
+    const w = s * 1.3;
+    const h = s * 0.84;
+    ctx.beginPath();
+    drawRoundedRect(x - w / 2, y - h * 0.72, w, h, Math.max(2, h * 0.18));
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x - w * 0.2, y + h * 0.25);
+    ctx.lineTo(x + w * 0.2, y + h * 0.25);
+    ctx.moveTo(x, y + h * 0.25);
+    ctx.lineTo(x, y + h * 0.5);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(x, y - s * 0.74);
+    ctx.lineTo(x + s * 0.74, y);
+    ctx.lineTo(x, y + s * 0.74);
+    ctx.lineTo(x - s * 0.74, y);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.fillStyle = "rgba(243, 248, 255, 0.8)";
+    ctx.beginPath();
+    ctx.arc(x, y, Math.max(1.7, s * 0.08), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
 function drawNodesAndEdges2D(projectionForNode) {
   const projections = new Map();
   state.hitRegions = [];
   for (const [hostId, node] of state.nodes.entries()) {
-    projections.set(hostId, applyScreenZoom(projectionForNode(node)));
+    projections.set(hostId, apply2DPan(applyScreenZoom(projectionForNode(node))));
   }
+  const edgesToRender = (state.mode === "2d" && state.topologyLayoutMode === "tree")
+    ? treeRoutedEdges(state.edges)
+    : state.edges;
 
   ctx.save();
   ctx.lineCap = "round";
-  for (const edge of state.edges) {
+  for (const edge of edgesToRender) {
     const a = projections.get(edge.a_host_id);
     const b = projections.get(edge.b_host_id);
     if (!a || !b) {
@@ -1186,6 +1889,7 @@ function drawNodesAndEdges2D(projectionForNode) {
     ctx.fillStyle = hostRecencyColor(node.host.last_seen);
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
+    drawNodeRoleGlyph2D(node.host, x, y, radius);
 
     if (isLocal) {
       drawLocalHostStar(x, y, radius + 6, projected.scale);
@@ -1333,7 +2037,29 @@ function stepPhysics() {
   const height = state.height;
   const centerX = width / 2;
   const centerY = height / 2;
-  const repulsion = state.mode === "idle" ? 2600 : 1900;
+  const useTreeLayout = state.topologyLayoutMode === "tree";
+  if (useTreeLayout) {
+    const targets = buildTreeLayoutTargets(nodes, state.edges, width, height);
+    for (const node of nodes) {
+      const target = targets.get(node.host.host_id);
+      if (!target) {
+        continue;
+      }
+      node.vx = (target.x - node.x) * 0.44;
+      node.vy = (target.y - node.y) * 0.44;
+      node.x += node.vx;
+      node.y += node.vy;
+      node.vx *= 0.42;
+      node.vy *= 0.42;
+      node.z *= 0.92;
+      node.vz *= 0.9;
+    }
+    return;
+  }
+
+  const repulsion = state.mode === "idle"
+    ? 2600
+    : 1900;
   const springStrength = 0.0048;
   const damping = 0.88;
   const attraction = 0.0017;
@@ -1342,16 +2068,23 @@ function stepPhysics() {
     70,
     220,
   );
+  const anchors = new Map();
+  const localNodeId = (nodes.find((node) => isLocalHost(node.host)) || {}).host?.host_id || null;
 
   for (let i = 0; i < nodes.length; i += 1) {
     const a = nodes[i];
+    const anchorA = anchors.get(a.host.host_id);
     for (let j = i + 1; j < nodes.length; j += 1) {
       const b = nodes[j];
+      const anchorB = anchors.get(b.host.host_id);
       const dx = a.x - b.x;
       const dy = a.y - b.y;
       const distSq = dx * dx + dy * dy + 1.0;
       const dist = Math.sqrt(distSq);
-      const force = repulsion / distSq;
+      let force = repulsion / distSq;
+      if (anchorA && anchorB && anchorA.tier === anchorB.tier) {
+        force *= 0.88;
+      }
       const fx = (dx / dist) * force;
       const fy = (dy / dist) * force;
 
@@ -1372,7 +2105,27 @@ function stepPhysics() {
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-    const force = (dist - idealEdgeLength) * springStrength;
+    let targetLength = idealEdgeLength;
+    let edgeSpring = springStrength;
+    const relation = edgeRelationship(edge);
+    if (relation === "routed-to" || relation === "gateway-for") {
+      targetLength *= 0.74;
+      edgeSpring *= 1.18;
+    } else if (relation === "upstream/external") {
+      targetLength *= 1.12;
+      edgeSpring *= 1.05;
+    } else if (relation === "same-segment-peer") {
+      targetLength *= 0.9;
+      edgeSpring *= 1.08;
+    }
+    if (edge.inferred) {
+      edgeSpring *= 0.9;
+    }
+    const confidence = Number(edge.confidence);
+    if (Number.isFinite(confidence)) {
+      edgeSpring *= clamp(confidence, 0.35, 1.15);
+    }
+    const force = (dist - targetLength) * edgeSpring;
     const fx = (dx / dist) * force;
     const fy = (dy / dist) * force;
 
@@ -1383,8 +2136,25 @@ function stepPhysics() {
   }
 
   for (const node of nodes) {
-    node.vx += (centerX - node.x) * attraction;
-    node.vy += (centerY - node.y) * attraction;
+    const hostId = node.host.host_id;
+    const isLocal = localNodeId && hostId === localNodeId;
+    const anchor = anchors.get(hostId);
+
+    if (anchor) {
+      node.vx += (anchor.x - node.x) * anchor.strength;
+      node.vy += (anchor.y - node.y) * anchor.strength;
+      node.vx += (centerX - node.x) * 0.00032;
+      node.vy += (centerY - node.y) * 0.00032;
+    } else {
+      node.vx += (centerX - node.x) * attraction;
+      node.vy += (centerY - node.y) * attraction;
+    }
+
+    if (isLocal) {
+      const localLockStrength = 0.48;
+      node.vx += (centerX - node.x) * localLockStrength;
+      node.vy += (centerY - node.y) * localLockStrength;
+    }
 
     node.vx *= damping;
     node.vy *= damping;
@@ -1409,6 +2179,13 @@ function stepPhysics() {
     } else {
       node.z *= 0.95;
       node.vz *= 0.9;
+    }
+
+    if (isLocal) {
+      node.x = centerX;
+      node.y = centerY;
+      node.vx *= 0.2;
+      node.vy *= 0.2;
     }
   }
 }
@@ -1497,57 +2274,97 @@ canvas.addEventListener("contextmenu", (event) => {
 });
 
 canvas.addEventListener("pointerdown", (event) => {
-  if (state.mode !== "3d") {
+  if (state.mode === "3d") {
+    event.preventDefault();
+    state.camera.dragging = true;
+    state.camera.dragMode = (event.button === 2 || event.shiftKey || event.altKey) ? "pan" : "orbit";
+    state.camera.dragDistance = 0;
+    state.camera.pointerId = event.pointerId;
+    state.camera.lastX = event.clientX;
+    state.camera.lastY = event.clientY;
+    canvas.setPointerCapture(event.pointerId);
+    return;
+  }
+  if (state.mode !== "2d" || event.button !== 0) {
     return;
   }
 
   event.preventDefault();
-  state.camera.dragging = true;
-  state.camera.dragMode = (event.button === 2 || event.shiftKey || event.altKey) ? "pan" : "orbit";
-  state.camera.dragDistance = 0;
-  state.camera.pointerId = event.pointerId;
-  state.camera.lastX = event.clientX;
-  state.camera.lastY = event.clientY;
+  state.view2d.dragging = true;
+  state.view2d.dragDistance = 0;
+  state.view2d.pointerId = event.pointerId;
+  state.view2d.lastX = event.clientX;
+  state.view2d.lastY = event.clientY;
   canvas.setPointerCapture(event.pointerId);
 });
 
 canvas.addEventListener("pointermove", (event) => {
-  if (!state.camera.dragging || state.mode !== "3d") {
+  if (state.mode === "3d" && state.camera.dragging) {
+    const dx = event.clientX - state.camera.lastX;
+    const dy = event.clientY - state.camera.lastY;
+    state.camera.lastX = event.clientX;
+    state.camera.lastY = event.clientY;
+    state.camera.dragDistance += Math.abs(dx) + Math.abs(dy);
+
+    if (state.camera.dragMode === "pan") {
+      panCameraByPixels(dx, dy);
+    } else {
+      state.camera.yaw += dx * 0.0055;
+      state.camera.pitch = clamp(state.camera.pitch - dy * 0.0036, 0.52, 1.34);
+    }
+    return;
+  }
+  if (state.mode !== "2d" || !state.view2d.dragging) {
     return;
   }
 
-  const dx = event.clientX - state.camera.lastX;
-  const dy = event.clientY - state.camera.lastY;
-  state.camera.lastX = event.clientX;
-  state.camera.lastY = event.clientY;
-  state.camera.dragDistance += Math.abs(dx) + Math.abs(dy);
-
-  if (state.camera.dragMode === "pan") {
-    panCameraByPixels(dx, dy);
-  } else {
-    state.camera.yaw += dx * 0.0055;
-    state.camera.pitch = clamp(state.camera.pitch - dy * 0.0036, 0.52, 1.34);
-  }
+  const dx = event.clientX - state.view2d.lastX;
+  const dy = event.clientY - state.view2d.lastY;
+  state.view2d.lastX = event.clientX;
+  state.view2d.lastY = event.clientY;
+  state.view2d.dragDistance += Math.abs(dx) + Math.abs(dy);
+  state.view2d.offsetX += dx;
+  state.view2d.offsetY += dy;
 });
 
 canvas.addEventListener("pointerup", (event) => {
   if (state.camera.pointerId === event.pointerId) {
-    canvas.releasePointerCapture(event.pointerId);
+    if (canvas.hasPointerCapture(event.pointerId)) {
+      canvas.releasePointerCapture(event.pointerId);
+    }
+    if (state.camera.dragDistance > 4) {
+      state.camera.lastDragAt = Date.now();
+    }
+    state.camera.dragging = false;
+    state.camera.dragMode = null;
+    state.camera.pointerId = null;
+    state.camera.dragDistance = 0;
   }
-  if (state.camera.dragDistance > 4) {
-    state.camera.lastDragAt = Date.now();
+  if (state.view2d.pointerId === event.pointerId) {
+    if (canvas.hasPointerCapture(event.pointerId)) {
+      canvas.releasePointerCapture(event.pointerId);
+    }
+    if (state.view2d.dragDistance > 4) {
+      state.view2d.lastDragAt = Date.now();
+    }
+    state.view2d.dragging = false;
+    state.view2d.pointerId = null;
+    state.view2d.dragDistance = 0;
   }
-  state.camera.dragging = false;
-  state.camera.dragMode = null;
-  state.camera.pointerId = null;
-  state.camera.dragDistance = 0;
 });
 
-canvas.addEventListener("pointercancel", () => {
-  state.camera.dragging = false;
-  state.camera.dragMode = null;
-  state.camera.pointerId = null;
-  state.camera.dragDistance = 0;
+canvas.addEventListener("pointercancel", (event) => {
+  if (!event || state.camera.pointerId === event.pointerId) {
+    state.camera.dragging = false;
+    state.camera.dragMode = null;
+    state.camera.pointerId = null;
+    state.camera.dragDistance = 0;
+  }
+  if (!event || state.view2d.pointerId === event.pointerId) {
+    state.view2d.dragging = false;
+    state.view2d.pointerId = null;
+    state.view2d.dragDistance = 0;
+  }
 });
 
 canvas.addEventListener("wheel", (event) => {
@@ -1609,6 +2426,9 @@ window.addEventListener("keydown", (event) => {
 
 canvas.addEventListener("click", (event) => {
   if (state.mode === "3d" && Date.now() - state.camera.lastDragAt < 180) {
+    return;
+  }
+  if (state.mode === "2d" && Date.now() - state.view2d.lastDragAt < 180) {
     return;
   }
 
@@ -1759,6 +2579,13 @@ modeButton.addEventListener("click", () => {
   const index = MODE_ORDER.indexOf(state.mode);
   const nextIndex = (index + 1) % MODE_ORDER.length;
   state.mode = MODE_ORDER[nextIndex];
+  state.camera.dragging = false;
+  state.camera.dragMode = null;
+  state.camera.pointerId = null;
+  state.camera.dragDistance = 0;
+  state.view2d.dragging = false;
+  state.view2d.pointerId = null;
+  state.view2d.dragDistance = 0;
   if (state.mode === "3d") {
     state.camera.distance = clamp(
       zoomPercentToCameraDistance(state.zoomPercent),
@@ -1779,6 +2606,17 @@ hostFilterButton.addEventListener("click", () => {
   const nextIndex = (index + 1) % HOST_FILTER_ORDER.length;
   state.hostFilter = HOST_FILTER_ORDER[nextIndex];
   updateHostFilterLabel();
+
+  if (state.lastSnapshot) {
+    applySnapshot(state.lastSnapshot);
+  }
+});
+
+topologyLayoutButton.addEventListener("click", () => {
+  const index = TOPOLOGY_LAYOUT_ORDER.indexOf(state.topologyLayoutMode);
+  const nextIndex = (index + 1) % TOPOLOGY_LAYOUT_ORDER.length;
+  state.topologyLayoutMode = TOPOLOGY_LAYOUT_ORDER[nextIndex];
+  updateTopologyLayoutLabel();
 
   if (state.lastSnapshot) {
     applySnapshot(state.lastSnapshot);
@@ -1833,6 +2671,7 @@ async function initialize() {
   applyZoomPercent(DEFAULT_ZOOM_PERCENT, { syncCamera: true });
   updateModeLabel();
   updateHostFilterLabel();
+  updateTopologyLayoutLabel();
   syncSettingsInputsFromState();
   setSettingsTab("display");
   setStatus("Session is running.", "info");

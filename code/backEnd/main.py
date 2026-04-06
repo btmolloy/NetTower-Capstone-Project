@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import concurrent.futures
+import ipaddress
 import threading
 import time
 import json
 from pathlib import Path
 
 from backEnd.pipeline.event_bus import event_bus
-from backEnd.models.events import host_seen
-from backEnd.models.types import event_meta, sensor_source, confidence_level
+from backEnd.models.events import host_seen, traffic_seen
+from backEnd.models.types import event_meta, sensor_source, confidence_level, protocol
 from backEnd.processors.correlation import correlator
 from backEnd.processors.enrichment import enricher
 from backEnd.processors.extractors import extractor
@@ -23,6 +24,7 @@ from backEnd.storage.librarian import librarian
 from backEnd.storage.mongo_client import mongo_client_manager
 from backEnd.utils.logging import get_logger
 from backEnd.utils.net import (
+    detect_default_gateway_ipv4,
     detect_interface_network_cidr,
     detect_interface_ipv4,
     detect_interface_mac,
@@ -30,6 +32,88 @@ from backEnd.utils.net import (
     is_private_rfc1918_ipv4,
 )
 from backEnd.runtime.runtime_state import write_ready_flag, clear_ready_flag
+
+
+_COMMON_PRIVATE_SWEEP_CIDRS: tuple[str, ...] = (
+    "192.168.1.0/24",
+    "192.168.0.0/24",
+    "10.0.0.0/24",
+    "10.0.1.0/24",
+    "10.1.1.0/24",
+    "172.16.0.0/24",
+    "172.16.1.0/24",
+    "172.20.0.0/24",
+)
+
+
+def _to_lightweight_cidr(target: str | None) -> str | None:
+    """
+    Normalize CIDR target for lightweight interval sweeps.
+
+    For very broad private networks (/0.. /23), scan a /24 first.
+    """
+    if not target:
+        return None
+
+    try:
+        network = ipaddress.ip_network(str(target).strip(), strict=False)
+    except Exception:
+        return None
+
+    if not isinstance(network, ipaddress.IPv4Network):
+        return None
+
+    if network.prefixlen < 24 and is_private_rfc1918_cidr(str(network)):
+        network = ipaddress.ip_network(f"{network.network_address}/24", strict=False)
+
+    return str(network)
+
+
+def _private_24_cidr_for_ip(ip: str | None) -> str | None:
+    if not ip:
+        return None
+    try:
+        normalized_ip = str(ipaddress.ip_address(str(ip).strip()))
+    except Exception:
+        return None
+
+    if not is_private_rfc1918_ipv4(normalized_ip):
+        return None
+
+    return str(ipaddress.ip_network(f"{normalized_ip}/24", strict=False))
+
+
+def _discover_private_targets_from_hosts(mongo, limit_hosts: int = 1200, limit_targets: int = 4) -> list[str]:
+    """
+    Collect frequent private /24 targets from recently seen hosts.
+    """
+    counts: dict[str, int] = {}
+    try:
+        handles = mongo.handles()
+        cursor = (
+            handles.hosts
+            .find({}, {"ips": 1, "last_seen": 1})
+            .sort("last_seen", -1)
+            .limit(max(1, int(limit_hosts)))
+        )
+    except Exception:
+        return []
+
+    try:
+        for doc in cursor:
+            ips = doc.get("ips", [])
+            if not isinstance(ips, list):
+                continue
+            for raw_ip in ips:
+                cidr = _private_24_cidr_for_ip(raw_ip if isinstance(raw_ip, str) else None)
+                if not cidr:
+                    continue
+                counts[cidr] = counts.get(cidr, 0) + 1
+    except Exception:
+        return []
+
+    ranked = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    return [cidr for cidr, _count in ranked[: max(1, int(limit_targets))]]
 
 
 def load_session_config() -> SessionConfig:
@@ -147,6 +231,26 @@ def main() -> None:
     except Exception as exc:
         log.warning(f"Unable to determine local network CIDR: {exc}")
 
+    local_ip_hint: str | None = None
+    local_mac_hint: str | None = None
+    default_gateway_ip: str | None = None
+    try:
+        local_ip_hint = detect_interface_ipv4(interface)
+    except Exception as exc:
+        log.warning(f"Unable to determine local interface IPv4: {exc}")
+    try:
+        local_mac_hint = detect_interface_mac(interface)
+    except Exception:
+        local_mac_hint = None
+    try:
+        default_gateway_ip = detect_default_gateway_ipv4(interface)
+    except Exception as exc:
+        log.warning(f"Unable to determine default gateway IPv4: {exc}")
+        default_gateway_ip = None
+
+    if default_gateway_ip:
+        log.info(f"Default gateway: {default_gateway_ip}")
+
     if not session.get_discovery_target_cidr() and local_network_cidr:
         session.set_discovery_target_cidr(local_network_cidr)
 
@@ -192,19 +296,22 @@ def main() -> None:
 
     event_extractor = extractor()
     event_enricher = enricher(session_cfg)
-    event_correlator = correlator(store)
+    event_correlator = correlator(
+        store,
+        local_ip=local_ip_hint,
+        local_network_cidr=local_network_cidr,
+        gateway_ip=default_gateway_ip,
+    )
 
     local_ip_for_heartbeat: str | None = None
     local_mac_for_heartbeat: str | None = None
 
-    # Seed topology with the local interface host so UI has immediate context.
+    # Seed topology with local + gateway context so hierarchy has immediate anchors.
     try:
-        local_ip = detect_interface_ipv4(interface)
-        local_mac = None
-        try:
-            local_mac = detect_interface_mac(interface)
-        except Exception:
-            local_mac = None
+        local_ip = local_ip_hint
+        local_mac = local_mac_hint
+        if not local_ip:
+            raise RuntimeError("local interface IPv4 is unavailable")
 
         bootstrap_event = host_seen(
             meta=event_meta(
@@ -227,6 +334,50 @@ def main() -> None:
         local_ip_for_heartbeat = local_ip
         local_mac_for_heartbeat = local_mac
         log.info(f"Seeded local host into topology: {local_ip}")
+
+        if default_gateway_ip:
+            gateway_event = host_seen(
+                meta=event_meta(
+                    source=sensor_source.arp,
+                    iface=interface,
+                    confidence=confidence_level.high,
+                ),
+                ip=default_gateway_ip,
+                mac=None,
+            )
+            gateway_event, gateway_enrichment = event_enricher.enrich(gateway_event)
+            gateway_host_updates, gateway_edge_updates, _ = event_correlator.process(
+                gateway_event,
+                gateway_enrichment,
+            )
+            for host in gateway_host_updates:
+                store.upsert_host(host)
+            for edge in gateway_edge_updates:
+                store.upsert_edge(edge)
+
+            bootstrap_edge_event = traffic_seen(
+                meta=event_meta(
+                    source=sensor_source.arp,
+                    iface=interface,
+                    confidence=confidence_level.medium,
+                ),
+                src_ip=local_ip,
+                dst_ip=default_gateway_ip,
+                proto=protocol.arp,
+                src_port=None,
+                dst_port=None,
+                bytes=0,
+            )
+            bootstrap_edge_event, bootstrap_edge_enrichment = event_enricher.enrich(bootstrap_edge_event)
+            edge_host_updates, edge_updates, _ = event_correlator.process(
+                bootstrap_edge_event,
+                bootstrap_edge_enrichment,
+            )
+            for host in edge_host_updates:
+                store.upsert_host(host)
+            for edge in edge_updates:
+                store.upsert_edge(edge)
+            log.info(f"Seeded default gateway into topology: {default_gateway_ip}")
     except Exception as exc:
         log.warning(f"Unable to seed local host into topology: {exc}")
 
@@ -246,6 +397,9 @@ def main() -> None:
     local_heartbeat_interval_seconds = 10.0
     next_local_heartbeat_ts = 0.0
     active_methods_disabled_logged = False
+    common_private_sweep_index = 0
+    max_interval_targets = 4
+    max_discovered_private_targets = 2
 
     try:
         while not stop_event.is_set():
@@ -360,34 +514,74 @@ def main() -> None:
 
                     if interval_seconds > 0 and now - last_interval_scan_ts >= interval_seconds:
 
-                        target = session.get_discovery_target_cidr()
                         allow_all_targets = session.get_allow_all_active_targets()
-                        if not allow_all_targets:
-                            if target and not is_private_rfc1918_cidr(target):
-                                target = None
-                            if not target:
-                                if local_network_cidr and is_private_rfc1918_cidr(local_network_cidr):
-                                    target = local_network_cidr
+                        interval_targets: list[str] = []
+                        seen_interval_targets: set[str] = set()
 
-                        if not target:
+                        def _add_interval_target(raw_target: str | None) -> None:
+                            if not raw_target:
+                                return
+                            normalized = _to_lightweight_cidr(raw_target)
+                            if not normalized:
+                                return
+                            if not allow_all_targets and not is_private_rfc1918_cidr(normalized):
+                                return
+                            if normalized in seen_interval_targets:
+                                return
+                            seen_interval_targets.add(normalized)
+                            interval_targets.append(normalized)
+
+                        _add_interval_target(session.get_discovery_target_cidr())
+                        _add_interval_target(local_network_cidr)
+
+                        if not allow_all_targets:
+                            discovered_private_targets = _discover_private_targets_from_hosts(
+                                mongo,
+                                limit_targets=max_discovered_private_targets,
+                            )
+                            for discovered_target in discovered_private_targets:
+                                _add_interval_target(discovered_target)
+
+                            attempts = 0
+                            while (
+                                len(interval_targets) < max_interval_targets
+                                and attempts < len(_COMMON_PRIVATE_SWEEP_CIDRS)
+                            ):
+                                candidate = _COMMON_PRIVATE_SWEEP_CIDRS[
+                                    common_private_sweep_index % len(_COMMON_PRIVATE_SWEEP_CIDRS)
+                                ]
+                                common_private_sweep_index += 1
+                                attempts += 1
+                                _add_interval_target(candidate)
+
+                        if not interval_targets:
                             log.warning(
-                                "Skipping interval discovery: private-only scope requires an "
-                                "RFC1918 target CIDR, but none is available."
+                                "Skipping interval discovery: no eligible scan targets "
+                                f"(allow_all_active_targets={allow_all_targets})."
                             )
                         elif active_interval_thread is None or not active_interval_thread.is_alive():
-                            log.info(f"Running interval discovery: target={target}")
+                            targets_for_run = tuple(interval_targets[:max_interval_targets])
+                            log.info(
+                                "Running interval discovery: "
+                                f"targets={list(targets_for_run)}"
+                            )
 
                             def _run_interval_discovery() -> None:
-                                try:
-                                    run_discovery(
-                                        session_cfg,
-                                        bus,
-                                        target=target,
-                                        enable_icmp_scan=icmp_scan_enabled,
-                                        enable_nmap_scan=nmap_scan_enabled,
-                                    )
-                                except Exception:
-                                    log.exception("Interval discovery task failed")
+                                for target in targets_for_run:
+                                    if shutdown_requested() or stop_event.is_set():
+                                        return
+                                    try:
+                                        run_discovery(
+                                            session_cfg,
+                                            bus,
+                                            target=target,
+                                            enable_icmp_scan=icmp_scan_enabled,
+                                            enable_nmap_scan=nmap_scan_enabled,
+                                        )
+                                    except Exception:
+                                        log.exception(
+                                            f"Interval discovery task failed: target={target}"
+                                        )
 
                             active_interval_thread = threading.Thread(
                                 target=_run_interval_discovery,

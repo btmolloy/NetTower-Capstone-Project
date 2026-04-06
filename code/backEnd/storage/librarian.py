@@ -57,6 +57,14 @@ class librarian:
         key = edge_entity.make_edge_key(a_host_id, b_host_id, proto)
         return self.find_edge_by_key(key)
 
+    def list_hosts(self, limit: int = 5000) -> list[host_entity]:
+        cursor = self._hosts.find({}).sort("last_seen", -1).limit(max(1, int(limit)))
+        return [host_entity.from_dict(doc) for doc in cursor]
+
+    def list_edges(self, limit: int = 10000) -> list[edge_entity]:
+        cursor = self._edges.find({}).sort("last_seen", -1).limit(max(1, int(limit)))
+        return [edge_entity.from_dict(doc) for doc in cursor]
+
     # --------------------
     # Writes / upserts
     # --------------------
@@ -78,6 +86,12 @@ class librarian:
                 "role": doc.get("role"),
                 "role_confidence": doc.get("role_confidence"),
                 "role_scores": doc.get("role_scores", {}),
+                "node_role": doc.get("node_role"),
+                "node_role_confidence": doc.get("node_role_confidence"),
+                "parent_candidate": doc.get("parent_candidate"),
+                "parent_confidence": doc.get("parent_confidence"),
+                "topology_layer": doc.get("topology_layer"),
+                "is_external": doc.get("is_external"),
                 "last_seen": last_seen,
                 "ports": doc.get("ports", []),
                 "services": doc.get("services", []),
@@ -104,7 +118,8 @@ class librarian:
                 "last_seen": last_seen,
                 "count": doc.get("count", 0),
                 "ports": doc.get("ports", []),
-                "relation": doc.get("relation", "traffic"),
+                "relation": doc.get("relation", "observed-traffic-peer"),
+                "relationship_type": doc.get("relationship_type", doc.get("relation", "observed-traffic-peer")),
                 "inferred": doc.get("inferred", False),
                 "confidence": doc.get("confidence", 1.0),
                 "evidence": doc.get("evidence", []),
