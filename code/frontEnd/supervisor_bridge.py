@@ -59,7 +59,14 @@ def serialize_value(value: Any) -> Any:
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     if isinstance(value, datetime):
-        return value.isoformat()
+        # PyMongo commonly returns naive UTC datetimes. Emit explicit UTC ("Z")
+        # so the frontend computes recency correctly regardless of local timezone.
+        dt = value
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        else:
+            dt = dt.astimezone(timezone.utc)
+        return dt.isoformat().replace("+00:00", "Z")
     if isinstance(value, date):
         return value.isoformat()
     if isinstance(value, dict):
@@ -91,11 +98,22 @@ def get_topology_snapshot(runtime_cfg: RuntimeConfig, limit_hosts: int, limit_ed
             "host_id": 1,
             "ips": 1,
             "macs": 1,
+            "hostnames": 1,
             "vendor": 1,
             "os_guess": 1,
+            "role": 1,
+            "role_confidence": 1,
+            "role_scores": 1,
+            "node_role": 1,
+            "node_role_confidence": 1,
+            "parent_candidate": 1,
+            "parent_confidence": 1,
+            "topology_layer": 1,
+            "is_external": 1,
             "first_seen": 1,
             "last_seen": 1,
             "ports": 1,
+            "services": 1,
         }
         edge_projection = {
             "_id": 0,
@@ -103,6 +121,11 @@ def get_topology_snapshot(runtime_cfg: RuntimeConfig, limit_hosts: int, limit_ed
             "a_host_id": 1,
             "b_host_id": 1,
             "proto": 1,
+            "relation": 1,
+            "relationship_type": 1,
+            "inferred": 1,
+            "confidence": 1,
+            "evidence": 1,
             "first_seen": 1,
             "last_seen": 1,
             "count": 1,
@@ -162,6 +185,15 @@ def handle_command(
         return True, {"running": supervisor.is_running()}
 
     if command == "get_topology_snapshot":
+        if not supervisor.is_running():
+            return True, {
+                "hosts": [],
+                "edges": [],
+                "warning": "No active session. Start a session to view live topology.",
+                "captured_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "running": False,
+            }
+
         limit_hosts = int(payload.get("limit_hosts", 250))
         limit_edges = int(payload.get("limit_edges", 500))
         limit_hosts = max(10, min(2000, limit_hosts))

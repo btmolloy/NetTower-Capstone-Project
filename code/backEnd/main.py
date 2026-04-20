@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import concurrent.futures
+import ipaddress
 import threading
 import time
 import json
 from pathlib import Path
 
 from backEnd.pipeline.event_bus import event_bus
+from backEnd.models.events import host_seen, traffic_seen
+from backEnd.models.types import event_meta, sensor_source, confidence_level, protocol
 from backEnd.processors.correlation import correlator
 from backEnd.processors.enrichment import enricher
 from backEnd.processors.extractors import extractor
@@ -19,8 +23,97 @@ from backEnd.sensors.passive_listener import passive_listener
 from backEnd.storage.librarian import librarian
 from backEnd.storage.mongo_client import mongo_client_manager
 from backEnd.utils.logging import get_logger
-from backEnd.utils.net import detect_interface_network_cidr
+from backEnd.utils.net import (
+    detect_default_gateway_ipv4,
+    detect_interface_network_cidr,
+    detect_interface_ipv4,
+    detect_interface_mac,
+    is_private_rfc1918_cidr,
+    is_private_rfc1918_ipv4,
+)
 from backEnd.runtime.runtime_state import write_ready_flag, clear_ready_flag
+
+
+_COMMON_PRIVATE_SWEEP_CIDRS: tuple[str, ...] = (
+    "192.168.1.0/24",
+    "192.168.0.0/24",
+    "10.0.0.0/24",
+    "10.0.1.0/24",
+    "10.1.1.0/24",
+    "172.16.0.0/24",
+    "172.16.1.0/24",
+    "172.20.0.0/24",
+)
+
+
+def _to_lightweight_cidr(target: str | None) -> str | None:
+    """
+    Normalize CIDR target for lightweight interval sweeps.
+
+    For very broad private networks (/0.. /23), scan a /24 first.
+    """
+    if not target:
+        return None
+
+    try:
+        network = ipaddress.ip_network(str(target).strip(), strict=False)
+    except Exception:
+        return None
+
+    if not isinstance(network, ipaddress.IPv4Network):
+        return None
+
+    if network.prefixlen < 24 and is_private_rfc1918_cidr(str(network)):
+        network = ipaddress.ip_network(f"{network.network_address}/24", strict=False)
+
+    return str(network)
+
+
+def _private_24_cidr_for_ip(ip: str | None) -> str | None:
+    if not ip:
+        return None
+    try:
+        normalized_ip = str(ipaddress.ip_address(str(ip).strip()))
+    except Exception:
+        return None
+
+    if not is_private_rfc1918_ipv4(normalized_ip):
+        return None
+
+    return str(ipaddress.ip_network(f"{normalized_ip}/24", strict=False))
+
+
+def _discover_private_targets_from_hosts(mongo, limit_hosts: int = 1200, limit_targets: int = 4) -> list[str]:
+    """
+    Collect frequent private /24 targets from recently seen hosts.
+    """
+    counts: dict[str, int] = {}
+    try:
+        handles = mongo.handles()
+        cursor = (
+            handles.hosts
+            .find({}, {"ips": 1, "last_seen": 1})
+            .sort("last_seen", -1)
+            .limit(max(1, int(limit_hosts)))
+        )
+    except Exception:
+        return []
+
+    try:
+        for doc in cursor:
+            ips = doc.get("ips", [])
+            if not isinstance(ips, list):
+                continue
+            for raw_ip in ips:
+                cidr = _private_24_cidr_for_ip(raw_ip if isinstance(raw_ip, str) else None)
+                if not cidr:
+                    continue
+                counts[cidr] = counts.get(cidr, 0) + 1
+    except Exception:
+        return []
+
+    ranked = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    return [cidr for cidr, _count in ranked[: max(1, int(limit_targets))]]
 
 
 def load_session_config() -> SessionConfig:
@@ -38,6 +131,75 @@ def load_session_config() -> SessionConfig:
         data = json.load(f)
 
     return SessionConfig.from_dict(data)
+
+
+def apply_runtime_session_updates(session: SessionManager, log) -> None:
+    """
+    Apply runtime session updates written by the frontend bridge.
+    """
+
+    runtime_dir = Path(__file__).resolve().parents[1] / "runtime"
+    update_file = runtime_dir / "session_update.json"
+
+    if not update_file.exists():
+        return
+
+    try:
+        with open(update_file, encoding="utf-8") as f:
+            updates = json.load(f)
+    except Exception as exc:
+        log.warning(f"Ignoring invalid runtime session update: {exc}")
+        try:
+            update_file.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return
+
+    try:
+        if "enable_active_discovery" in updates:
+            session.set_enable_active_discovery(bool(updates["enable_active_discovery"]))
+            log.info(
+                "Runtime update: enable_active_discovery="
+                f"{session.get_enable_active_discovery()}"
+            )
+
+        if "allow_all_active_targets" in updates:
+            session.set_allow_all_active_targets(bool(updates["allow_all_active_targets"]))
+            log.info(
+                "Runtime update: allow_all_active_targets="
+                f"{session.get_allow_all_active_targets()}"
+            )
+
+        if "enable_icmp_scan" in updates:
+            session.set_enable_icmp_scan(bool(updates["enable_icmp_scan"]))
+            log.info(
+                "Runtime update: enable_icmp_scan="
+                f"{session.get_enable_icmp_scan()}"
+            )
+
+        if "enable_nmap_scan" in updates:
+            session.set_enable_nmap_scan(bool(updates["enable_nmap_scan"]))
+            log.info(
+                "Runtime update: enable_nmap_scan="
+                f"{session.get_enable_nmap_scan()}"
+            )
+
+        if "discovery_target_cidr" in updates:
+            cidr_value = updates.get("discovery_target_cidr")
+            if cidr_value is not None:
+                cidr_value = str(cidr_value).strip()
+                if cidr_value == "":
+                    cidr_value = None
+            session.set_discovery_target_cidr(cidr_value)
+            log.info(
+                "Runtime update: discovery_target_cidr="
+                f"{session.get_discovery_target_cidr()}"
+            )
+    finally:
+        try:
+            update_file.unlink(missing_ok=True)
+        except Exception:
+            pass
 
 
 def main() -> None:
@@ -63,11 +225,44 @@ def main() -> None:
 
     log.info(f"Interface: {interface}")
 
-    if not session.get_discovery_target_cidr():
-        resolved_cidr = detect_interface_network_cidr(interface)
-        session.set_discovery_target_cidr(resolved_cidr)
+    local_network_cidr: str | None = None
+    try:
+        local_network_cidr = detect_interface_network_cidr(interface)
+    except Exception as exc:
+        log.warning(f"Unable to determine local network CIDR: {exc}")
+
+    local_ip_hint: str | None = None
+    local_mac_hint: str | None = None
+    default_gateway_ip: str | None = None
+    try:
+        local_ip_hint = detect_interface_ipv4(interface)
+    except Exception as exc:
+        log.warning(f"Unable to determine local interface IPv4: {exc}")
+    try:
+        local_mac_hint = detect_interface_mac(interface)
+    except Exception:
+        local_mac_hint = None
+    try:
+        default_gateway_ip = detect_default_gateway_ipv4(interface)
+    except Exception as exc:
+        log.warning(f"Unable to determine default gateway IPv4: {exc}")
+        default_gateway_ip = None
+
+    if default_gateway_ip:
+        log.info(f"Default gateway: {default_gateway_ip}")
+
+    if not session.get_discovery_target_cidr() and local_network_cidr:
+        session.set_discovery_target_cidr(local_network_cidr)
 
     log.info(f"Discovery CIDR: {session.get_discovery_target_cidr()}")
+    log.info(
+        "Active discovery scope: "
+        f"{'all targets' if session.get_allow_all_active_targets() else 'private-only (RFC1918)'}"
+    )
+    log.info(
+        "Active discovery methods: "
+        f"icmp={session.get_enable_icmp_scan()} nmap={session.get_enable_nmap_scan()}"
+    )
 
     stop_event = threading.Event()
 
@@ -80,6 +275,16 @@ def main() -> None:
         mongo.connect()
         log.info("Mongo client connected.")
 
+        # Hard-reset topology collections at the beginning of every session.
+        # This guarantees the UI starts from clean state each app run.
+        handles = mongo.handles()
+        deleted_hosts = handles.hosts.delete_many({}).deleted_count
+        deleted_edges = handles.edges.delete_many({}).deleted_count
+        log.info(
+            "Cleared Mongo collections for new session: "
+            f"hosts={deleted_hosts}, edges={deleted_edges}"
+        )
+
         # Backend is now considered ready
         write_ready_flag()
 
@@ -91,15 +296,125 @@ def main() -> None:
 
     event_extractor = extractor()
     event_enricher = enricher(session_cfg)
-    event_correlator = correlator(store)
+    event_correlator = correlator(
+        store,
+        local_ip=local_ip_hint,
+        local_network_cidr=local_network_cidr,
+        gateway_ip=default_gateway_ip,
+    )
+
+    local_ip_for_heartbeat: str | None = None
+    local_mac_for_heartbeat: str | None = None
+
+    # Seed topology with local + gateway context so hierarchy has immediate anchors.
+    try:
+        local_ip = local_ip_hint
+        local_mac = local_mac_hint
+        if not local_ip:
+            raise RuntimeError("local interface IPv4 is unavailable")
+
+        bootstrap_event = host_seen(
+            meta=event_meta(
+                source=sensor_source.ping,
+                iface=interface,
+                confidence=confidence_level.high,
+            ),
+            ip=local_ip,
+            mac=local_mac,
+        )
+        bootstrap_event, bootstrap_enrichment = event_enricher.enrich(bootstrap_event)
+        host_updates, edge_updates, _ = event_correlator.process(
+            bootstrap_event,
+            bootstrap_enrichment,
+        )
+        for host in host_updates:
+            store.upsert_host(host)
+        for edge in edge_updates:
+            store.upsert_edge(edge)
+        local_ip_for_heartbeat = local_ip
+        local_mac_for_heartbeat = local_mac
+        log.info(f"Seeded local host into topology: {local_ip}")
+
+        if default_gateway_ip:
+            gateway_event = host_seen(
+                meta=event_meta(
+                    source=sensor_source.arp,
+                    iface=interface,
+                    confidence=confidence_level.high,
+                ),
+                ip=default_gateway_ip,
+                mac=None,
+            )
+            gateway_event, gateway_enrichment = event_enricher.enrich(gateway_event)
+            gateway_host_updates, gateway_edge_updates, _ = event_correlator.process(
+                gateway_event,
+                gateway_enrichment,
+            )
+            for host in gateway_host_updates:
+                store.upsert_host(host)
+            for edge in gateway_edge_updates:
+                store.upsert_edge(edge)
+
+            bootstrap_edge_event = traffic_seen(
+                meta=event_meta(
+                    source=sensor_source.arp,
+                    iface=interface,
+                    confidence=confidence_level.medium,
+                ),
+                src_ip=local_ip,
+                dst_ip=default_gateway_ip,
+                proto=protocol.arp,
+                src_port=None,
+                dst_port=None,
+                bytes=0,
+            )
+            bootstrap_edge_event, bootstrap_edge_enrichment = event_enricher.enrich(bootstrap_edge_event)
+            edge_host_updates, edge_updates, _ = event_correlator.process(
+                bootstrap_edge_event,
+                bootstrap_edge_enrichment,
+            )
+            for host in edge_host_updates:
+                store.upsert_host(host)
+            for edge in edge_updates:
+                store.upsert_edge(edge)
+            log.info(f"Seeded default gateway into topology: {default_gateway_ip}")
+    except Exception as exc:
+        log.warning(f"Unable to seed local host into topology: {exc}")
 
     passive_thread: passive_listener | None = None
+    active_interval_thread: threading.Thread | None = None
+    targeted_scan_executor = concurrent.futures.ThreadPoolExecutor(
+        max_workers=4,
+        thread_name_prefix="active-targeted-discovery",
+    )
+    targeted_scan_futures: dict[str, concurrent.futures.Future] = {}
+    max_pending_targeted_jobs = 128
+    passive_restart_cooldown_seconds = 5.0
+    passive_next_restart_not_before = 0.0
 
     last_interval_scan_ts = 0.0
     targeted_last_scan_ts: dict[str, float] = {}
+    local_heartbeat_interval_seconds = 10.0
+    next_local_heartbeat_ts = 0.0
+    active_methods_disabled_logged = False
+    common_private_sweep_index = 0
+    max_interval_targets = 4
+    max_discovered_private_targets = 2
 
     try:
         while not stop_event.is_set():
+
+            completed_targeted_ips: list[str] = []
+            for target_ip, future in targeted_scan_futures.items():
+                if not future.done():
+                    continue
+                completed_targeted_ips.append(target_ip)
+                try:
+                    future.result()
+                except Exception:
+                    log.exception(f"Targeted discovery task failed: ip={target_ip}")
+            for target_ip in completed_targeted_ips:
+                targeted_scan_futures.pop(target_ip, None)
 
             if shutdown_requested():
                 log.info("Shutdown flag detected. Beginning graceful shutdown...")
@@ -107,18 +422,58 @@ def main() -> None:
 
             now = time.time()
 
+            if local_ip_for_heartbeat and now >= next_local_heartbeat_ts:
+                try:
+                    heartbeat_event = host_seen(
+                        meta=event_meta(
+                            source=sensor_source.ping,
+                            iface=interface,
+                            confidence=confidence_level.high,
+                        ),
+                        ip=local_ip_for_heartbeat,
+                        mac=local_mac_for_heartbeat,
+                    )
+                    heartbeat_event, heartbeat_enrichment = event_enricher.enrich(heartbeat_event)
+                    host_updates, edge_updates, _ = event_correlator.process(
+                        heartbeat_event,
+                        heartbeat_enrichment,
+                    )
+                    for host in host_updates:
+                        store.upsert_host(host)
+                    for edge in edge_updates:
+                        store.upsert_edge(edge)
+                except Exception:
+                    log.exception("Failed local host heartbeat update")
+                finally:
+                    next_local_heartbeat_ts = now + local_heartbeat_interval_seconds
+
+            # -------------------------------------------------
+            # Runtime session updates
+            # -------------------------------------------------
+
+            apply_runtime_session_updates(session, log)
+
             # -------------------------------------------------
             # Passive listener dynamic control
             # -------------------------------------------------
 
             passive_enabled = session.get_enable_passive_listener()
 
+            # If the passive thread exited (e.g., permissions/backend capture error),
+            # reset state so the runtime can retry and produce visible diagnostics.
+            if passive_thread is not None and not passive_thread.is_alive():
+                log.warning(
+                    "Passive listener thread exited unexpectedly; "
+                    f"retrying in {passive_restart_cooldown_seconds:.0f}s"
+                )
+                passive_thread = None
+                passive_next_restart_not_before = now + passive_restart_cooldown_seconds
+
             if passive_enabled and passive_thread is None:
-
-                passive_thread = passive_listener(session_cfg, bus, stop_event)
-                passive_thread.start()
-
-                log.info("Passive listener started")
+                if now >= passive_next_restart_not_before:
+                    passive_thread = passive_listener(session_cfg, bus, stop_event)
+                    passive_thread.start()
+                    log.info("Passive listener started")
 
             if not passive_enabled and passive_thread is not None:
 
@@ -135,27 +490,115 @@ def main() -> None:
                     log.info("Shutdown flag detected during passive listener shutdown.")
                     break
 
+            if not passive_enabled:
+                passive_next_restart_not_before = 0.0
+
             # -------------------------------------------------
             # Active discovery interval
             # -------------------------------------------------
 
             if session.get_enable_active_discovery():
+                icmp_scan_enabled = session.get_enable_icmp_scan()
+                nmap_scan_enabled = session.get_enable_nmap_scan()
+                if not (icmp_scan_enabled or nmap_scan_enabled):
+                    if not active_methods_disabled_logged:
+                        log.info(
+                            "Active sensor is enabled but both ICMP and NMAP scans are disabled; "
+                            "skipping active discovery."
+                        )
+                        active_methods_disabled_logged = True
+                else:
+                    active_methods_disabled_logged = False
 
-                interval_seconds = session.get_discovery_interval_seconds()
+                    interval_seconds = session.get_discovery_interval_seconds()
 
-                if interval_seconds > 0 and now - last_interval_scan_ts >= interval_seconds:
+                    if interval_seconds > 0 and now - last_interval_scan_ts >= interval_seconds:
 
-                    target = session.get_discovery_target_cidr()
+                        allow_all_targets = session.get_allow_all_active_targets()
+                        interval_targets: list[str] = []
+                        seen_interval_targets: set[str] = set()
 
-                    log.info(f"Running interval discovery: target={target}")
+                        def _add_interval_target(raw_target: str | None) -> None:
+                            if not raw_target:
+                                return
+                            normalized = _to_lightweight_cidr(raw_target)
+                            if not normalized:
+                                return
+                            if not allow_all_targets and not is_private_rfc1918_cidr(normalized):
+                                return
+                            if normalized in seen_interval_targets:
+                                return
+                            seen_interval_targets.add(normalized)
+                            interval_targets.append(normalized)
 
-                    run_discovery(session_cfg, bus, target=target)
+                        _add_interval_target(session.get_discovery_target_cidr())
+                        _add_interval_target(local_network_cidr)
 
-                    last_interval_scan_ts = now
+                        if not allow_all_targets:
+                            discovered_private_targets = _discover_private_targets_from_hosts(
+                                mongo,
+                                limit_targets=max_discovered_private_targets,
+                            )
+                            for discovered_target in discovered_private_targets:
+                                _add_interval_target(discovered_target)
 
-                    if shutdown_requested():
-                        log.info("Shutdown flag detected after interval discovery.")
-                        break
+                            attempts = 0
+                            while (
+                                len(interval_targets) < max_interval_targets
+                                and attempts < len(_COMMON_PRIVATE_SWEEP_CIDRS)
+                            ):
+                                candidate = _COMMON_PRIVATE_SWEEP_CIDRS[
+                                    common_private_sweep_index % len(_COMMON_PRIVATE_SWEEP_CIDRS)
+                                ]
+                                common_private_sweep_index += 1
+                                attempts += 1
+                                _add_interval_target(candidate)
+
+                        if not interval_targets:
+                            log.warning(
+                                "Skipping interval discovery: no eligible scan targets "
+                                f"(allow_all_active_targets={allow_all_targets})."
+                            )
+                        elif active_interval_thread is None or not active_interval_thread.is_alive():
+                            targets_for_run = tuple(interval_targets[:max_interval_targets])
+                            log.info(
+                                "Running interval discovery: "
+                                f"targets={list(targets_for_run)}"
+                            )
+
+                            def _run_interval_discovery() -> None:
+                                for target in targets_for_run:
+                                    if shutdown_requested() or stop_event.is_set():
+                                        return
+                                    try:
+                                        run_discovery(
+                                            session_cfg,
+                                            bus,
+                                            target=target,
+                                            enable_icmp_scan=icmp_scan_enabled,
+                                            enable_nmap_scan=nmap_scan_enabled,
+                                        )
+                                    except Exception:
+                                        log.exception(
+                                            f"Interval discovery task failed: target={target}"
+                                        )
+
+                            active_interval_thread = threading.Thread(
+                                target=_run_interval_discovery,
+                                daemon=True,
+                                name="active-interval-discovery",
+                            )
+                            active_interval_thread.start()
+                        else:
+                            log.info("Skipping interval discovery: previous interval scan still running")
+
+                        last_interval_scan_ts = now
+
+                        if shutdown_requested():
+                            log.info("Shutdown flag detected after interval discovery.")
+                            break
+            else:
+                active_methods_disabled_logged = False
 
             # -------------------------------------------------
             # Process pipeline events
@@ -194,22 +637,57 @@ def main() -> None:
                 # Targeted active discovery
                 # ---------------------------------------------
 
-                if session.get_enable_active_discovery() and signals.targeted_scan_ip:
+                if (
+                    session.get_enable_active_discovery()
+                    and (session.get_enable_icmp_scan() or session.get_enable_nmap_scan())
+                    and signals.targeted_scan_ip
+                ):
 
                     ip = signals.targeted_scan_ip.strip()
 
                     if ip:
+                        icmp_scan_enabled = session.get_enable_icmp_scan()
+                        nmap_scan_enabled = session.get_enable_nmap_scan()
+                        if not session.get_allow_all_active_targets():
+                            try:
+                                in_private_scope = is_private_rfc1918_ipv4(ip)
+                            except Exception:
+                                log.info(
+                                    f"Skipping targeted discovery with invalid IP: ip={ip}"
+                                )
+                                continue
+
+                            if not in_private_scope:
+                                log.info(
+                                    f"Skipping targeted discovery outside private scope: "
+                                    f"ip={ip} scope=rfc1918"
+                                )
+                                continue
 
                         cooldown_seconds = session.get_targeted_scan_cooldown_seconds()
 
                         last = targeted_last_scan_ts.get(ip, 0.0)
 
                         if now - last >= cooldown_seconds:
+                            if ip in targeted_scan_futures:
+                                continue
+                            if len(targeted_scan_futures) >= max_pending_targeted_jobs:
+                                log.warning(
+                                    "Skipping targeted discovery: pending queue is full "
+                                    f"(pending={len(targeted_scan_futures)} cap={max_pending_targeted_jobs})"
+                                )
+                                continue
 
-                            log.info(f"Running targeted discovery: ip={ip}")
-
-                            run_discovery(session_cfg, bus, target=ip)
-
+                            log.info(f"Scheduling targeted discovery: ip={ip}")
+                            future = targeted_scan_executor.submit(
+                                run_discovery,
+                                session_cfg,
+                                bus,
+                                ip,
+                                icmp_scan_enabled,
+                                nmap_scan_enabled,
+                            )
+                            targeted_scan_futures[ip] = future
                             targeted_last_scan_ts[ip] = now
 
                             if shutdown_requested():
@@ -247,6 +725,13 @@ def main() -> None:
                 passive_thread.join(timeout=2.0)
             except Exception:
                 pass
+
+        try:
+            targeted_scan_executor.shutdown(wait=False, cancel_futures=True)
+        except TypeError:
+            targeted_scan_executor.shutdown(wait=False)
+        except Exception:
+            pass
 
         try:
             mongo.close()

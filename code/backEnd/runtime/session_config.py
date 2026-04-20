@@ -21,6 +21,9 @@ class SessionConfig:
     # Sensor toggles
     enable_passive_listener: bool = True
     enable_active_discovery: bool = False
+    allow_all_active_targets: bool = False
+    enable_icmp_scan: bool = True
+    enable_nmap_scan: bool = True
 
     # Network selection
     interface: str | None = None
@@ -57,6 +60,9 @@ class SessionConfig:
         return SessionConfig(
             enable_passive_listener=bool(self.enable_passive_listener),
             enable_active_discovery=bool(self.enable_active_discovery),
+            allow_all_active_targets=bool(self.allow_all_active_targets),
+            enable_icmp_scan=bool(self.enable_icmp_scan),
+            enable_nmap_scan=bool(self.enable_nmap_scan),
             interface=interface,
             discovery_target_cidr=discovery_target_cidr,
             discovery_interval_seconds=discovery_interval_seconds,
@@ -66,6 +72,9 @@ class SessionConfig:
         return {
             "enable_passive_listener": self.enable_passive_listener,
             "enable_active_discovery": self.enable_active_discovery,
+            "allow_all_active_targets": self.allow_all_active_targets,
+            "enable_icmp_scan": self.enable_icmp_scan,
+            "enable_nmap_scan": self.enable_nmap_scan,
             "interface": self.interface,
             "discovery_target_cidr": self.discovery_target_cidr,
             "discovery_interval_seconds": self.discovery_interval_seconds,
@@ -78,6 +87,9 @@ class SessionConfig:
         return SessionConfig(
             enable_passive_listener=bool(data.get("enable_passive_listener", True)),
             enable_active_discovery=bool(data.get("enable_active_discovery", False)),
+            allow_all_active_targets=bool(data.get("allow_all_active_targets", False)),
+            enable_icmp_scan=bool(data.get("enable_icmp_scan", True)),
+            enable_nmap_scan=bool(data.get("enable_nmap_scan", True)),
             interface=data.get("interface"),
             discovery_target_cidr=data.get("discovery_target_cidr"),
             discovery_interval_seconds=int(data.get("discovery_interval_seconds", 120)),

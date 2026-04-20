@@ -21,6 +21,8 @@
       </div>
       <div class="topbar-actions">
         <button id="settings-btn" class="button-secondary" type="button">Settings</button>
+        <button id="host-filter-btn" class="button-secondary" type="button">Hosts: All</button>
+        <button id="topology-layout-btn" class="button-secondary" type="button">Topology: Tree</button>
         <button id="map-mode-btn" class="button-secondary" type="button">Mode: 2D</button>
         <button id="stop-session-btn" class="button-danger" type="button">Stop Session</button>
       </div>
@@ -40,6 +42,24 @@
             <span class="legend-dot legend-warm"></span><span>Warm (30-120s)</span>
             <span class="legend-dot legend-cold"></span><span>Cold (120s+)</span>
           </div>
+        </div>
+
+        <div class="zoom-control" aria-label="Topology zoom control">
+          <span class="zoom-symbol">+</span>
+          <div class="zoom-slider-shell">
+            <div id="zoom-slider-fill" class="zoom-slider-fill"></div>
+            <input
+              id="zoom-slider"
+              class="zoom-slider"
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value="33"
+              aria-label="Zoom level"
+            />
+          </div>
+          <span class="zoom-symbol">−</span>
         </div>
       </div>
 
@@ -65,26 +85,114 @@
 
   <aside id="settings-drawer" class="settings-drawer">
     <header class="drawer-header">
-      <h2>Display Settings</h2>
+      <h2>Settings</h2>
       <button id="close-settings-btn" class="icon-button" type="button" aria-label="Close settings">
         ×
       </button>
     </header>
-    <form id="settings-form" class="settings-form">
-      <label class="field">
-        <span>Refresh interval (ms)</span>
-        <input id="refresh-interval-input" type="number" min="500" step="100" value="3000" />
-      </label>
-      <label class="field">
-        <span>Host render limit</span>
-        <input id="host-limit-input" type="number" min="10" max="2000" value="250" />
-      </label>
-      <label class="field">
-        <span>Edge render limit</span>
-        <input id="edge-limit-input" type="number" min="10" max="4000" value="500" />
-      </label>
-      <button id="apply-settings-btn" class="button-primary" type="submit">Apply Settings</button>
-    </form>
+
+    <div class="settings-tabs" role="tablist" aria-label="Settings sections">
+      <button
+        id="settings-tab-display"
+        class="settings-tab is-active"
+        type="button"
+        data-settings-tab="display"
+        role="tab"
+        aria-selected="true"
+      >
+        Display
+      </button>
+      <button
+        id="settings-tab-data"
+        class="settings-tab"
+        type="button"
+        data-settings-tab="data"
+        role="tab"
+        aria-selected="false"
+      >
+        Data
+      </button>
+    </div>
+
+    <section id="settings-panel-display" class="settings-panel is-active" role="tabpanel" aria-labelledby="settings-tab-display">
+      <form id="settings-form" class="settings-form">
+        <section class="settings-group stale-settings-group" aria-label="Stale host visibility settings">
+          <h3 class="settings-group-title">Stale Host Visibility</h3>
+          <label class="toggle-field" for="hide-stale-toggle">
+            <span>Hide stale hosts</span>
+            <span class="toggle-switch-wrap">
+              <input id="hide-stale-toggle" type="checkbox" checked />
+              <span class="toggle-switch-slider"></span>
+            </span>
+          </label>
+          <div id="stale-dependent-options" class="stale-dependent-options">
+            <label id="keep-stale-private-field" class="toggle-field" for="keep-stale-private-toggle">
+              <span>Keep stale private hosts</span>
+              <span class="toggle-switch-wrap">
+                <input id="keep-stale-private-toggle" type="checkbox" checked />
+                <span class="toggle-switch-slider"></span>
+              </span>
+            </label>
+            <label id="stale-threshold-field" class="field">
+              <span>Hide host after (seconds)</span>
+              <input id="stale-threshold-input" type="number" min="15" max="7200" step="15" value="180" />
+            </label>
+          </div>
+        </section>
+        <section class="settings-group active-settings-group" aria-label="Active sensor settings">
+          <h3 class="settings-group-title">Active Sensor</h3>
+          <label class="toggle-field" for="active-sensor-toggle">
+            <span>Enable active sensor</span>
+            <span class="toggle-switch-wrap">
+              <input id="active-sensor-toggle" type="checkbox" />
+              <span class="toggle-switch-slider"></span>
+            </span>
+          </label>
+          <label id="active-icmp-field" class="toggle-field" for="active-icmp-toggle">
+            <span>Enable ICMP/Ping scan</span>
+            <span class="toggle-switch-wrap">
+              <input id="active-icmp-toggle" type="checkbox" checked />
+              <span class="toggle-switch-slider"></span>
+            </span>
+          </label>
+          <label id="active-nmap-field" class="toggle-field" for="active-nmap-toggle">
+            <span>Enable NMAP scan</span>
+            <span class="toggle-switch-wrap">
+              <input id="active-nmap-toggle" type="checkbox" checked />
+              <span class="toggle-switch-slider"></span>
+            </span>
+          </label>
+          <label id="active-scope-all-field" class="toggle-field" for="active-scope-all-toggle">
+            <span>Allow public internet scans</span>
+            <span class="toggle-switch-wrap">
+              <input id="active-scope-all-toggle" type="checkbox" />
+              <span class="toggle-switch-slider"></span>
+            </span>
+          </label>
+        </section>
+        <label class="field">
+          <span>Refresh interval (ms)</span>
+          <input id="refresh-interval-input" type="number" min="500" step="100" value="3000" />
+        </label>
+        <label class="field">
+          <span>Host render limit</span>
+          <input id="host-limit-input" type="number" min="10" max="2000" value="250" />
+        </label>
+        <label class="field">
+          <span>Edge render limit</span>
+          <input id="edge-limit-input" type="number" min="10" max="4000" value="500" />
+        </label>
+        <button id="apply-settings-btn" class="button-primary" type="submit">Apply Settings</button>
+      </form>
+    </section>
+
+    <section id="settings-panel-data" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-data">
+      <div class="settings-list-header">
+        <h3>Topology List</h3>
+        <button id="refresh-data-list-btn" class="button-secondary" type="button">Refresh List</button>
+      </div>
+      <pre id="topology-text-list" class="topology-text-list">No topology data yet.</pre>
+    </section>
   </aside>
 
   <div id="drawer-backdrop" class="drawer-backdrop"></div>
