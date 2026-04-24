@@ -9,6 +9,8 @@
         <p data-start="408" data-end="454">Project Documentation: <a href="https://github.com/btmolloy/NetTower-Capstone-Project/tree/main/docs" target="_blank" rel="noopener">https://github.com/btmolloy/NetTower-Capstone-Project/tree/main/docs</a>&nbsp;</p>
     </li>
     <li data-start="406" data-end="454">Learning with AI Repository: &nbsp;<a href="https://github.com/btmolloy/Learning-With-AI" target="_blank" rel="noopener">https://github.com/btmolloy/Learning-With-AI</a>&nbsp;</li>
+    <hr>
+    <li data-start="406" data-end="454">Product Site: &nbsp;<a href="nettower.org" target="_blank" rel="noopener">nettower.org</a>&nbsp;</li>
 </ul>
 <hr data-start="502" data-end="505" />
 <h1 data-start="507" data-end="529"><strong data-start="509" data-end="529">Project Overview</strong></h1>
