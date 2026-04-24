@@ -1,5 +1,4 @@
 <h2 data-start="234" data-end="247"><span style="font-size: 36pt;">NetTower - Capstone</span></h2>
-
 <h1 data-start="340" data-end="359"><strong data-start="342" data-end="359">Project Links</strong></h1>
 <ul data-start="361" data-end="500">
     <li data-start="361" data-end="405">
@@ -131,8 +130,8 @@
 </ul>
 <p data-start="3069" data-end="3201">The system will operate locally or in a self-hosted environment and will not rely on external cloud services for core functionality.</p>
 <p data-start="3069" data-end="3201">&nbsp;</p>
-<h3 data-start="3069" data-end="3201">Project Architecture (In Progress)</h3>
-<p data-start="3069" data-end="3201">NetTower/<br />│<br />├── backEnd/<br />│&nbsp; &nbsp;<br />│&nbsp; &nbsp;<br />│<br />├── frontEnd/<br />│&nbsp;&nbsp;<br />│&nbsp; &nbsp;<br />│&nbsp; &nbsp;<br />│<br />└── tests/<br />&nbsp;&nbsp;</p>
+<h3 data-start="3069" data-end="3201">Project Architecture&nbsp;</h3>
+<p data-start="3069" data-end="3201">code/<br />├── backEnd/<br />│ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; ├── models/<br />│ &nbsp; │ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; │ &nbsp; ├── __init__.py<br />│ &nbsp; │ &nbsp; ├── entities.py<br />│ &nbsp; │ &nbsp; ├── events.py<br />│ &nbsp; │ &nbsp; └── types.py<br />│ &nbsp; ├── pipeline/<br />│ &nbsp; │ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; │ &nbsp; └── event_bus.py<br />│ &nbsp; ├── processors/<br />│ &nbsp; │ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; │ &nbsp; ├── correlation.py<br />│ &nbsp; │ &nbsp; ├── enrichment.py<br />│ &nbsp; │ &nbsp; └── extractors.py<br />│ &nbsp; ├── resources/<br />│ &nbsp; │ &nbsp; ├── device_hints.json<br />│ &nbsp; │ &nbsp; └── oui_vendors.json<br />│ &nbsp; ├── runtime/<br />│ &nbsp; │ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; │ &nbsp; ├── __init__.py<br />│ &nbsp; │ &nbsp; ├── binary_resolver.py<br />│ &nbsp; │ &nbsp; ├── config.py<br />│ &nbsp; │ &nbsp; ├── mongo_runtime.py<br />│ &nbsp; │ &nbsp; ├── paths.py<br />│ &nbsp; │ &nbsp; ├── runtime_state.py<br />│ &nbsp; │ &nbsp; ├── session_config.py<br />│ &nbsp; │ &nbsp; ├── session_manager.py<br />│ &nbsp; │ &nbsp; ├── settings.py<br />│ &nbsp; │ &nbsp; ├── shutdown.py<br />│ &nbsp; │ &nbsp; └── supervisor.py<br />│ &nbsp; ├── sensors/<br />│ &nbsp; │ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; │ &nbsp; ├── active_discovery.py<br />│ &nbsp; │ &nbsp; └── passive_listener.py<br />│ &nbsp; ├── storage/<br />│ &nbsp; │ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; │ &nbsp; ├── librarian.py<br />│ &nbsp; │ &nbsp; └── mongo_client.py<br />│ &nbsp; ├── utils/<br />│ &nbsp; │ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; │ &nbsp; ├── logging.py<br />│ &nbsp; │ &nbsp; └── net.py<br />│ &nbsp; ├── __init__.py<br />│ &nbsp; └── main.py<br />├── frontEnd/<br />│ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; ├── css/<br />│ &nbsp; │ &nbsp; └── styles.css<br />│ &nbsp; ├── js/<br />│ &nbsp; │ &nbsp; ├── launch_controller.js<br />│ &nbsp; │ &nbsp; └── main_controller.js<br />│ &nbsp; ├── node_modules/<br />│ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; ├── windows/<br />│ &nbsp; │ &nbsp; ├── launch.html<br />│ &nbsp; │ &nbsp; └── main.html<br />│ &nbsp; ├── main.js<br />│ &nbsp; ├── NetTowerIcon-square.png<br />│ &nbsp; ├── NetTowerIcon.png<br />│ &nbsp; ├── package-lock.json<br />│ &nbsp; ├── package.json<br />│ &nbsp; ├── preload.js<br />│ &nbsp; └── supervisor_bridge.py<br />├── runtime/<br />│ &nbsp; ├── mongod.log<br />│ &nbsp; └── session_config.json<br />├── runtime_binaries/<br />│ &nbsp; ├── macos/<br />│ &nbsp; │ &nbsp; └── mongod<br />│ &nbsp; └── windows/<br />│ &nbsp; &nbsp; &nbsp; ├── mongod.exe<br />│ &nbsp; &nbsp; &nbsp; └── tshark.exe<br />├── tests/<br />│ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; ├── helpers.py<br />│ &nbsp; ├── NetTower_Test_Plan_Outline.docx<br />│ &nbsp; ├── run_code_tests.py<br />│ &nbsp; ├── test_01_session_config.py<br />│ &nbsp; ├── test_02_enrichment.py<br />│ &nbsp; ├── test_03_correlation_inference.py<br />│ &nbsp; ├── test_04_extractor_pipeline_snapshot.py<br />│ &nbsp; └── test_05_runtime_and_additional_integration.py<br />├── venv/<br />│ &nbsp; └── ...<br />└──.gitignore<br /><br />&nbsp;&nbsp;</p>
 <hr data-start="3203" data-end="3206" />
 <h1 data-start="3208" data-end="3238"><strong data-start="3210" data-end="3238">Timeline:</strong></h1>
 <ul data-start="3463" data-end="3660">
@@ -220,7 +219,7 @@
     </li>
 </ul>
 <hr data-start="3983" data-end="3986" />
-<h1 data-start="3988" data-end="4027"><strong data-start="3990" data-end="4027">Testing Strategy (TBD)</strong></h1>
+<h1 data-start="3988" data-end="4027"><strong data-start="3990" data-end="4027">Testing Strategy&nbsp;</strong></h1>
 <ul data-start="4029" data-end="4286">
     <li data-start="4029" data-end="4076">
         <p data-start="4031" data-end="4076">Unit testing of discovery and inference logic</p>
@@ -238,8 +237,11 @@
         <p data-start="4239" data-end="4286">Performance testing under varying device counts</p>
     </li>
 </ul>
+<p>&nbsp;</p>
+<p>There will be 6 Manual tests and 28 automatic code tests. There will be 34 tests in total.</p>
 <p data-start="4288" data-end="4390">&nbsp;</p>
-<hr data-start="4392" data-end="4395" />
+
+<hr data-start="4916" data-end="4919" />
 <h1 data-start="4921" data-end="4945"><strong data-start="4923" data-end="4945">Challenges / Risks</strong></h1>
 <ul data-start="4947" data-end="5226">
     <li data-start="4947" data-end="4986">
