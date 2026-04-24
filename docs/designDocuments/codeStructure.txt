@@ -1,45 +1,99 @@
-NetTower/
-└─ code/
-   ├─ frontEnd/
-   │  ├─ app.py
-   │  ├─ templates/
-   │  │  └─ index.html
-   │  └─ static/
-   │     ├─ css/
-   │     └─ js/
-   │
-   └─ backEnd/
-      ├─ __init__.py                  # kept (backend package root)
-      ├─ main.py                      # orchestrator + pipeline loop + scan scheduling
-      ├─ config.py                    # config object + defaults (intervals, iface, targets, mongo)
-      ├─ settings.py                  # user input layer (CLI/UI later) + validation calls
-      │
-      ├─ models/
-      │  ├─ __init__.py               # kept (models package for clean imports)
-      │  ├─ events.py                 # Event objects passed through pipeline (NOT stored by default)
-      │  ├─ entities.py               # Entity objects representing DB state (stored)
-      │  └─ types.py                  # Enums/shared types used by events/entities (Source, Proto, Confidence)
-      │
-      ├─ pipeline/
-      │  └─ event_bus.py              # publish/subscribe queue for Events (thread-safe)
-      │
-      ├─ sensors/
-      │  ├─ passive_listener.py       # starts tcpdump, emits packet-derived Events + flow summaries
-      │  └─ active_discovery.py       # runs targeted/interval scans (nmap/ping), emits Events
-      │
-      ├─ processors/
-      │  ├─ extractors.py             # normalize raw sensor outputs into canonical Event objects
-      │  ├─ enrichment.py             # add meaning (vendor/OUI, OS guess, role hints) using resources/*
-      │  └─ correlation.py            # uses Librarian read-only lookups to decide new/existing + outputs entity updates + signals
-      │
-      ├─ storage/
-      │  ├─ mongo_client.py           # Mongo connection + index setup + collection handles
-      │  └─ librarian.py              # write/upsert Entities + read-only lookups for Correlation
-      │
-      ├─ resources/
-      │  ├─ oui_vendors.json          # MAC OUI prefix -> vendor name
-      │  └─ device_hints.json         # optional: vendor/category/role hints (router/printer/server)
-      │
-      └─ utils/
-         ├─ logging.py                # shared logger setup + get_logger()
-         └─ net.py                    # IP/CIDR/MAC helpers + validation + normalization
+code/  						# project root
+├── backEnd/  					# Python backend service code
+│   ├── __pycache__/ 				# compiled Python cache files
+│   │   └── ...  				# collapsed contents
+│   ├── models/  				# topology data models
+│   │   ├── __pycache__/  			# compiled Python cache files
+│   │   │   └── ...  				# collapsed contents
+│   │   ├── __init__.py  			# package marker
+│   │   ├── entities.py  			# host/edge entity definitions
+│   │   ├── events.py  				# event dataclass definitions
+│   │   └── types.py  				# enums and event metadata types
+│   ├── pipeline/  				# event pipeline components
+│   │   ├── __pycache__/  			# compiled Python cache files
+│   │   │   └── ...  				# collapsed contents
+│   │   └── event_bus.py  			# in-memory publish/subscribe bus
+│   ├── processors/  				# processing and inference logic
+│   │   ├── __pycache__/  			# compiled Python cache files
+│   │   │   └── ...  				# collapsed contents
+│   │   ├── correlation.py  			# correlates events into topology updates
+│   │   ├── enrichment.py  			# adds vendor/role/OS hints
+│   │   └── extractors.py  			# normalizes raw sensor payloads
+│   ├── resources/  				# enrichment lookup data
+│   │   ├── device_hints.json  			# vendor/OUI/hostname hint mappings
+│   │   └── oui_vendors.json  			# OUI-to-vendor table
+│   ├── runtime/  				# runtime/session infrastructure code
+│   │   ├── __pycache__/  			# compiled Python cache files
+│   │   │   └── ...  				# collapsed contents
+│   │   ├── __init__.py  			# package marker
+│   │   ├── binary_resolver.py  		# resolves MongoDB binary path
+│   │   ├── config.py  				# runtime bootstrap config model
+│   │   ├── mongo_runtime.py  			# embedded Mongo process manager
+│   │   ├── paths.py  				# runtime path helpers
+│   │   ├── runtime_state.py  			# backend ready-flag helpers
+│   │   ├── session_config.py  			# validated scan session settings
+│   │   ├── session_manager.py  		# thread-safe session state manager
+│   │   ├── settings.py  			# runtime settings helpers
+│   │   ├── shutdown.py  			# shutdown flag helpers
+│   │   └── supervisor.py  			# start/stop session supervisor
+│   ├── sensors/  				# discovery and capture sensors
+│   │   ├── __pycache__/  			# compiled Python cache files
+│   │   │   └── ...  				# collapsed contents
+│   │   ├── active_discovery.py  		# active scan implementation
+│   │   └── passive_listener.py  		# passive packet listener
+│   ├── storage/  				# persistence layer
+│   │   ├── __pycache__/  			# compiled Python cache files
+│   │   │   └── ...  				# collapsed contents
+│   │   ├── librarian.py  			# host/edge storage gateway
+│   │   └── mongo_client.py  			# Mongo client and index setup
+│   ├── utils/  				# shared utility helpers
+│   │   ├── __pycache__/  			# compiled Python cache files
+│   │   │   └── ...  				# collapsed contents
+│   │   ├── logging.py  			# logger configuration utility
+│   │   └── net.py  				# network parsing/detection helpers
+│   ├── __init__.py  				# package marker
+│   └── main.py  				# backend runtime entry point
+├── frontEnd/  					# Electron frontend application
+│   ├── __pycache__/  				# compiled Python cache files
+│   │   └── ...  				# collapsed contents
+│   ├── css/  					# frontend styles
+│   │   └── styles.css  			# main stylesheet
+│   ├── js/  					# frontend controllers
+│   │   ├── launch_controller.js  		# launch screen logic
+│   │   └── main_controller.js  		# topology view logic
+│   ├── node_modules/  				# npm dependencies
+│   │   └── ...  				# collapsed contents
+│   ├── windows/  				# Electron window HTML
+│   │   ├── launch.html  			# launch/config UI
+│   │   └── main.html  				# main topology UI
+│   ├── main.js  				# Electron main process
+│   ├── NetTowerIcon-square.png  		# square app icon
+│   ├── NetTowerIcon.png  			# app icon
+│   ├── package-lock.json  			# locked npm dependency tree
+│   ├── package.json  				# frontend package manifest
+│   ├── preload.js  				# Electron preload IPC bridge
+│   └── supervisor_bridge.py  			# JSON bridge to backend supervisor
+├── runtime/  					# runtime output files
+│   ├── mongod.log  				# MongoDB runtime log
+│   └── session_config.json  			# active session config snapshot
+├── runtime_binaries/  				# packaged external binaries
+│   ├── macos/  				# macOS runtime binaries
+│   │   └── mongod  				# MongoDB binary (macOS)
+│   └── windows/  				# Windows runtime binaries
+│       ├── mongod.exe  			# MongoDB binary (Windows)
+│       └── tshark.exe  			# packet capture binary (Windows)
+├── tests/  					# automated tests and test docs
+│   ├── __pycache__/  				# compiled Python cache files
+│   │   └── ...  				# collapsed contents
+│   ├── helpers.py  				# in-memory test helpers/stubs
+│   ├── NetTower_Test_Plan_Outline.docx  	# test plan document
+│   ├── run_code_tests.py  			# custom test runner with evidence output
+│   ├── test_01_session_config.py  		# session config validation tests
+│   ├── test_02_enrichment.py  			# enrichment logic tests
+│   ├── test_03_correlation_inference.py  	# correlation/inference tests
+│   ├── test_04_extractor_pipeline_snapshot.py  # extractor/pipeline/snapshot tests
+│   └── test_05_runtime_and_additional_integration.py  # runtime and extra integration-style tests
+├── venv/ 			 		# Python virtual environment
+│   └── ...  					# collapsed contents
+├── .gitignore  				# Git ignore rules
+└── test_supervisor.py  			# supervisor launcher/check script

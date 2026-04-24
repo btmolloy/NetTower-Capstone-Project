@@ -1,11 +1,11 @@
 {
   "enable_passive_listener": true,
-  "enable_active_discovery": false,
+  "enable_active_discovery": true,
   "allow_all_active_targets": false,
   "enable_icmp_scan": true,
   "enable_nmap_scan": true,
   "interface": "en0",
-  "discovery_target_cidr": "10.15.216.90/24",
+  "discovery_target_cidr": "10.10.30.1/24",
   "discovery_interval_seconds": 120,
   "targeted_scan_cooldown_seconds": 300
 }
