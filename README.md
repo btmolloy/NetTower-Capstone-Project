@@ -1,14 +1,21 @@
 <h2 data-start="234" data-end="247"><span style="font-size: 36pt;">NetTower - Capstone</span></h2>
+
 <h1 data-start="340" data-end="359"><strong data-start="342" data-end="359">Project Links</strong></h1>
 <ul data-start="361" data-end="500">
     <li data-start="361" data-end="405">
         <p data-start="363" data-end="405">GitHub Repository: <a href="https://github.com/btmolloy/NetTower-Capstone-Project" target="_blank" rel="noopener">https://github.com/btmolloy/NetTower-Capstone-Project</a>&nbsp;</p>
     </li>
-    <li data-start="361" data-end="405">PPP Document: <a href="https://github.com/btmolloy/NetTower-Capstone-Project/blob/main/docs/PPP/PPP%20-%20NetTower.pdf" target="_blank" rel="noopener">https://github.com/btmolloy/NetTower-Capstone-Project/blob/main/docs/PPP/PPP%20-%20NetTower.pdf</a>&nbsp;</li>
-    <li data-start="406" data-end="454">
-        <p data-start="408" data-end="454">Project Documentation: <a href="https://github.com/btmolloy/NetTower-Capstone-Project/tree/main/docs" target="_blank" rel="noopener">https://github.com/btmolloy/NetTower-Capstone-Project/tree/main/docs</a>&nbsp;</p>
+    <li data-start="361" data-end="405">
+        <p data-start="363" data-end="405">Learning with AI Repository: &nbsp;<a href="https://github.com/btmolloy/Learning-With-AI" target="_blank" rel="noopener">https://github.com/btmolloy/Learning-With-AI</a></p>
     </li>
-    <li data-start="406" data-end="454">Learning with AI Repository: &nbsp;<a href="https://github.com/btmolloy/Learning-With-AI" target="_blank" rel="noopener">https://github.com/btmolloy/Learning-With-AI</a>&nbsp;</li>
+    <li data-start="361" data-end="405">
+        <p data-start="363" data-end="405">PPP Document: <a href="https://github.com/btmolloy/NetTower-Capstone-Project/blob/main/docs/presentations/PPP/PPP%20-%20NetTower.pdf" target="_blank" rel="noopener">https://github.com/btmolloy/NetTower-Capstone-Project/blob/main/docs/presentations/PPP/PPP%20-%20NetTower.pdf</a>&nbsp;</p>
+    </li>
+    <li data-start="406" data-end="454">Project Documentation: <a href="https://github.com/btmolloy/NetTower-Capstone-Project/tree/main/docs" target="_blank" rel="noopener">https://github.com/btmolloy/NetTower-Capstone-Project/tree/main/docs</a></li>
+</ul>
+<hr />
+<ul data-start="361" data-end="500">
+    <li data-start="406" data-end="454">Product Site:&nbsp; <a style="font-family: inherit; font-size: 1rem;" href="https://nettower.org" target="_blank" rel="noopener">https://nettower.org</a><span style="font-family: inherit; font-size: 1rem;">&nbsp;</span><a href="https://github.com/btmolloy/Learning-With-AI" target="_blank" rel="noopener"></a></li>
 </ul>
 <hr data-start="502" data-end="505" />
 <h1 data-start="507" data-end="529"><strong data-start="509" data-end="529">Project Overview</strong></h1>
@@ -90,7 +97,7 @@
                 <p data-start="1428" data-end="1490">The system shall allow users to pan and zoom the network view.</p>
             </li>
             <li data-start="1491" data-end="1572">
-                <p data-start="1493" data-end="1572">The system shall allow users to reposition nodes to support focused inspection.</p>
+                <p data-start="1493" data-end="1572">The system shall allow users to reposition view angle to support focused inspection.</p>
             </li>
         </ul>
         <p data-start="1574" data-end="1626"><strong data-start="1574" data-end="1626">8) User-Controlled Scanning &amp; Discovery Settings</strong></p>
@@ -233,33 +240,6 @@
 </ul>
 <p data-start="4288" data-end="4390">&nbsp;</p>
 <hr data-start="4392" data-end="4395" />
-<h1 data-start="4397" data-end="4419"><strong data-start="4399" data-end="4419">Learning with AI</strong></h1>
-<h3 data-start="4421" data-end="4440">Topics to Learn</h3>
-<ul data-start="4441" data-end="4586">
-    <li data-start="4441" data-end="4521">
-        <p data-start="4443" data-end="4521">Layer 2, Layer 3, and Layer 4 protocol behavior, limitations, and capabilities</p>
-    </li>
-    <li data-start="4522" data-end="4586">
-        <p data-start="4524" data-end="4586">Traffic packet structure and protocol breakdown at a low level</p>
-    </li>
-</ul>
-<h3 data-start="4588" data-end="4606">How AI Is Used</h3>
-<ul data-start="4607" data-end="4822">
-    <li data-start="4607" data-end="4654">
-        <p data-start="4609" data-end="4654">Breaking down protocol mechanics step-by-step</p>
-    </li>
-    <li data-start="4655" data-end="4698">
-        <p data-start="4657" data-end="4698">Exploring inference limits and edge cases</p>
-    </li>
-    <li data-start="4699" data-end="4760">
-        <p data-start="4701" data-end="4760">Supporting design decisions for discovery and visualization</p>
-    </li>
-    <li data-start="4761" data-end="4822">
-        <p data-start="4763" data-end="4822">Validating reasoning about constrained network environments</p>
-    </li>
-</ul>
-<p data-start="4824" data-end="4914">The AI component supports technical learning rather than adding AI-based product features.</p>
-<hr data-start="4916" data-end="4919" />
 <h1 data-start="4921" data-end="4945"><strong data-start="4923" data-end="4945">Challenges / Risks</strong></h1>
 <ul data-start="4947" data-end="5226">
     <li data-start="4947" data-end="4986">
