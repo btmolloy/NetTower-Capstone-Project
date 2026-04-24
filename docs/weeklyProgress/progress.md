@@ -109,5 +109,106 @@
     <li data-start="515" data-end="544"><span>Finalized main orchestrator loop and stabilized pipeline</span></li>
     <li data-start="515" data-end="544"><span><strong>DEADLINE 1</strong>: Complete - Backend Core Complete (Sprint 1 Presentation)</span></li>
 </ul>
-<p data-start="598" data-end="610"><strong data-start="598" data-end="606">LoC this week:</strong> &nbsp;1,042</p>
-<p data-start="598" data-end="610"><strong>LoC Total:</strong> 1,786</p>
+<p data-start="598" data-end="610"><strong data-start="598" data-end="606">LoC this week:</strong> &nbsp;2,242</p>
+<p data-start="598" data-end="610"><strong>LoC Total:</strong> <span>2,986</span><span>&nbsp;</span></p>
+<h3 data-start="498" data-end="514"><strong data-start="502" data-end="512">Week 8 (3/9) </strong><strong data-start="502" data-end="512"><span style="font-size: 12pt;">(Note: Date marks end of week.)</span></strong></h3>
+<ul data-start="515" data-end="596">
+    <li data-start="515" data-end="544">
+        <p data-start="517" data-end="544">Focus: Building the runtime infrastructure that starts the back and front end.&nbsp;</p>
+    </li>
+    <li data-start="515" data-end="544">Implemented start up and tear down of DB</li>
+    <li data-start="515" data-end="544">Created the runtime Supervisor that facilitates the start and end of the entire application</li>
+    <li data-start="515" data-end="544">Built the session configuration, manager and states that are passed to the back end.&nbsp;</li>
+</ul>
+<p data-start="598" data-end="610"><strong data-start="598" data-end="606">LoC this week:</strong> &nbsp;4,673</p>
+<p data-start="598" data-end="610"><strong>LoC Total:</strong> 7<span>,659</span><span>&nbsp;</span></p>
+<h3 data-start="498" data-end="514"><strong data-start="502" data-end="512">Week 9 (3/16) </strong><strong data-start="502" data-end="512"><span style="font-size: 12pt;">(Note: Date marks end of week.)</span></strong></h3>
+<ul data-start="515" data-end="596">
+    <li data-start="515" data-end="544">
+        <p data-start="517" data-end="544">Focus: <span>Front End</span></p>
+    </li>
+    <li data-start="515" data-end="544"><span>Used JS, HTML and CSS to build the electron front end.</span></li>
+    <li data-start="515" data-end="544"><span>Created the runtime launcher to specify configurations before starting the application.</span></li>
+    <li data-start="515" data-end="544"><span>Created the main dashboard that provides visual representation of the scanned data.</span></li>
+    <li data-start="515" data-end="544"><span>Implemented 2D and 3D viewing options</span></li>
+    <li data-start="515" data-end="544"><span>Implemented color based heat map.</span></li>
+</ul>
+<p data-start="598" data-end="610"><strong data-start="598" data-end="606">LoC this week:</strong> &nbsp;4,501</p>
+<p data-start="598" data-end="610"><strong>LoC Total:</strong> 12,160</p>
+<h3 data-start="0" data-end="93"><strong>Week 10 (3/23) <span style="font-size: 12pt;">(Note: Date marks end of week.)</span></strong></h3>
+<ul>
+    <li data-start="0" data-end="93">Focus: Frontend Integration &amp; Data Binding</li>
+    <li data-start="95" data-end="393">Connected frontend to backend data pipeline via IPC</li>
+    <li data-start="95" data-end="393">Implemented dynamic topology rendering from MongoDB data</li>
+    <li data-start="95" data-end="393">Integrated node-centric exploration (click/select nodes for details)</li>
+    <li data-start="95" data-end="393">Added initial connectivity visualization between hosts</li>
+    <li data-start="95" data-end="393">MILESTONE 2: Complete - Frontend Integration Functional</li>
+</ul>
+<p data-start="395" data-end="417"><strong>LoC this week:</strong> 1,320</p>
+<p data-start="419" data-end="438"><strong>LoC Total:</strong> 13,480</p>
+<p data-start="419" data-end="438">&nbsp;</p>
+<h3 data-start="441" data-end="539"><strong>Week 11 (3/30) <span style="font-size: 12pt;">(Note: Date marks end of week.)</span></strong></h3>
+<ul>
+    <li data-start="441" data-end="539">Focus: Visualization &amp; Interaction Enhancements</li>
+    <li data-start="541" data-end="819">Improved network topology layout (hierarchical structure: public IP &rarr; router &rarr; hosts)</li>
+    <li data-start="541" data-end="819">Refined edge rendering for clearer connectivity representation</li>
+    <li data-start="541" data-end="819">Enhanced 2D/3D switching performance and stability</li>
+    <li data-start="541" data-end="819">Implemented dynamic network state updates (real-time refresh behavior)</li>
+</ul>
+<p data-start="821" data-end="843"><strong>LoC this week:</strong> 1,185</p>
+<p data-start="845" data-end="864"><strong>LoC Total:</strong> 14,665</p>
+<h3 data-start="867" data-end="962"><strong>Week 12 (4/6)&nbsp;<span style="font-size: 12pt;">(Note: Date marks end of week.)</span></strong></h3>
+<ul>
+    <li data-start="867" data-end="962">Focus: User Controls &amp; Scanning Configuration</li>
+    <li data-start="964" data-end="1297">Implemented user-controlled scanning settings (CIDR, intervals, toggles)</li>
+    <li data-start="964" data-end="1297">Integrated frontend controls with backend session configuration</li>
+    <li data-start="964" data-end="1297">Added runtime configuration validation and persistence</li>
+    <li data-start="964" data-end="1297">Improved error handling and user feedback in UI</li>
+    <li data-start="964" data-end="1297"><strong>DEADLINE 2: </strong>Complete - Functional Prototype Ready (Backend + Initial Visualization)</li>
+</ul>
+<p data-start="1299" data-end="1321"><strong>LoC this week:</strong> 1,140</p>
+<p data-start="1323" data-end="1342"><strong>LoC Total:</strong> 15,805</p>
+<h3 data-start="1345" data-end="1450"><strong>Week 13 (4/13)&nbsp;</strong><strong><span style="font-size: 12pt;">(Note: Date marks end of week.)</span></strong></h3>
+<ul>
+    <li data-start="1345" data-end="1450">Focus: Visualization Enhancements &amp; Feature Completion</li>
+    <li data-start="1452" data-end="1751">Implemented activity/density heat mapping refinement</li>
+    <li data-start="1452" data-end="1751">Improved host classification display (OS, vendor, role hints)</li>
+    <li data-start="1452" data-end="1751">Enhanced node clustering and readability in dense networks</li>
+    <li data-start="1452" data-end="1751">Optimized rendering performance for larger topologies</li>
+    <li data-start="1452" data-end="1751"><strong>MILESTONE 3:</strong> Complete - Visualization Enhancements Integrated</li>
+</ul>
+<p data-start="1753" data-end="1775"><strong>LoC this week:</strong> 1,050</p>
+<p data-start="1777" data-end="1796"><strong>LoC Total:</strong> 16,855</p>
+<h3 data-start="1799" data-end="1891"><strong>Week 14 (4/20)&nbsp;</strong><strong><span style="font-size: 12pt;">(Note: Date marks end of week.)</span></strong></h3>
+<ul>
+    <li data-start="1799" data-end="1891">Focus: Refinement, Stability, and Testing</li>
+    <li data-start="1893" data-end="2185">Conducted end-to-end system testing (backend &rarr; frontend pipeline)</li>
+    <li data-start="1893" data-end="2185">Fixed topology inconsistencies and edge-case bugs</li>
+    <li data-start="1893" data-end="2185">Improved correlation accuracy for host relationships</li>
+    <li data-start="1893" data-end="2185">Stabilized runtime supervisor and session lifecycle handling</li>
+    <li data-start="1893" data-end="2185"><strong>DEADLINE 3: </strong>Complete - Refinement &amp; Testing Complete</li>
+</ul>
+<p data-start="2187" data-end="2207"><strong>LoC this week:</strong> 890</p>
+<p data-start="2209" data-end="2228"><strong>LoC Total: </strong>17,745</p>
+<h3 data-start="2231" data-end="2321"><strong>Week 15 (4/27) </strong><strong><span style="font-size: 12pt;">(Note: Date marks end of week.)</span></strong></h3>
+<ul>
+    <li data-start="2231" data-end="2321">Focus: Documentation, Demo Preparation, Finalization &amp; Publication</li>
+    <li data-start="2323" data-end="2624">Prepared final project documentation (architecture, pipeline, usage)</li>
+    <li data-start="2323" data-end="2624">Created demo scenarios for showcasing topology inference</li>
+    <li data-start="2323" data-end="2624">Cleaned and organized codebase for presentation readiness</li>
+    <li data-start="2323" data-end="2624">Finalized UI/UX adjustments for demonstration clarity</li>
+    <li data-start="2323" data-end="2624">Completed final system validation and polish</li>
+    <li data-start="2323" data-end="2624">Packaged application for presentation and submission</li>
+    <li data-start="2323" data-end="2624">Finalized all major features: topology view, node exploration, classification, connectivity, heat mapping, and user controls</li>
+    <li data-start="2323" data-end="2624">Delivered final demo and project submission</li>
+    <li data-start="2323" data-end="2624"><strong>MILESTONE 4:</strong> Complete - Documentation &amp; Demo Prepared</li>
+    <li data-start="2323" data-end="2624"><strong>DEADLINE 4:</strong> Complete - Finalized &amp; Published</li>
+</ul>
+<p data-start="2626" data-end="2646"><strong>LoC this week:</strong> 907</p>
+<p data-start="2648" data-end="2667"><strong>LoC Total:</strong> 18,652</p>
+<h3 data-start="2670" data-end="2754"><strong>Week 16 (5/4) <span style="font-size: 12pt;">(Note: Date marks end of week.)</span></strong></h3>
+<ul>
+    <li data-start="2670" data-end="2754">Focus: Buffer Period</li>
+</ul>
+<p data-start="3079" data-end="3099"><strong>LoC this week:</strong> 0</p>
+<p data-start="3101" data-end="3118" data-is-last-node="" data-is-only-node=""><strong>LoC Total:</strong> 18,652</p>
