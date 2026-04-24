@@ -95,5 +95,4 @@ code/  						# project root
 │   └── test_05_runtime_and_additional_integration.py  # runtime and extra integration-style tests
 ├── venv/ 			 		# Python virtual environment
 │   └── ...  					# collapsed contents
-├── .gitignore  				# Git ignore rules
-└── test_supervisor.py  			# supervisor launcher/check script
+└── .gitignore  				# Git ignore rules
