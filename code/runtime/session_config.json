@@ -1,6 +1,6 @@
 {
   "enable_passive_listener": true,
-  "enable_active_discovery": true,
+  "enable_active_discovery": false,
   "allow_all_active_targets": false,
   "enable_icmp_scan": true,
   "enable_nmap_scan": true,
