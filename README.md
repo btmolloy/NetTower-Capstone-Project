@@ -1,4 +1,5 @@
 <h2 data-start="234" data-end="247"><span style="font-size: 36pt;">NetTower - Capstone</span></h2>
+<p><span style="font-size: 18pt; color: #e62429; background-color: #fbeeb8;"><strong><span style="text-decoration: underline;">IMPORTANT NOTE FOR MANAGERS</span></strong>: I have an extended deadline due to military obligations so all my project requirements may not be complete by APR 24 and APR 26.</span></p>
 <h1 data-start="340" data-end="359"><strong data-start="342" data-end="359">Project Links</strong></h1>
 <ul data-start="361" data-end="500">
     <li data-start="361" data-end="405">
@@ -8,13 +9,24 @@
         <p data-start="363" data-end="405">Learning with AI Repository: &nbsp;<a href="https://github.com/btmolloy/Learning-With-AI" target="_blank" rel="noopener">https://github.com/btmolloy/Learning-With-AI</a></p>
     </li>
     <li data-start="361" data-end="405">
-        <p data-start="363" data-end="405">PPP Document: <a href="https://github.com/btmolloy/NetTower-Capstone-Project/blob/main/docs/presentations/PPP/PPP%20-%20NetTower.pdf" target="_blank" rel="noopener">https://github.com/btmolloy/NetTower-Capstone-Project/blob/main/docs/presentations/PPP/PPP%20-%20NetTower.pdf</a>&nbsp;</p>
+        <p data-start="363" data-end="405">Final Presentation: <a href="https://github.com/btmolloy/NetTower-Capstone-Project/tree/main/docs/presentations/Final%20Presentation" target="_blank" rel="noopener">https://github.com/btmolloy/NetTower-Capstone-Project/tree/main/docs/presentations/Final%20Presentation</a>&nbsp;</p>
     </li>
     <li data-start="406" data-end="454">Project Documentation: <a href="https://github.com/btmolloy/NetTower-Capstone-Project/tree/main/docs" target="_blank" rel="noopener">https://github.com/btmolloy/NetTower-Capstone-Project/tree/main/docs</a></li>
 </ul>
 <hr />
 <ul data-start="361" data-end="500">
-    <li data-start="406" data-end="454">Product Site:&nbsp; <a style="font-family: inherit; font-size: 1rem;" href="https://nettower.org" target="_blank" rel="noopener">https://nettower.org</a><span style="font-family: inherit; font-size: 1rem;">&nbsp;</span><a href="https://github.com/btmolloy/Learning-With-AI" target="_blank" rel="noopener"></a></li>
+    <li data-start="406" data-end="454">Product Site (Deployment):&nbsp; <a style="font-family: inherit; font-size: 1rem;" href="https://nettower.org" target="_blank" rel="noopener">https://nettower.org</a></li>
+    <li data-start="406" data-end="454">Portfolio Entry: <a href="https://www.molloy.info/project.html?project=nettower-agentless-network-topology" target="_blank" rel="noopener">https://www.molloy.info/project.html?project=nettower-agentless-network-topology</a>&nbsp;</li>
+    <li data-start="406" data-end="454">Updated Resume: <a href="https://github.com/btmolloy/NetTower-Capstone-Project/tree/main/docs/resume" target="_blank" rel="noopener">https://github.com/btmolloy/NetTower-Capstone-Project/tree/main/docs/resume</a>&nbsp;
+        <ul data-start="361" data-end="500">
+            <li data-start="406" data-end="454">Canvas Resume: <a href="https://nku.instructure.com/files/14090560/download?download_frd=1" target="_blank" rel="noopener" data-api-endpoint="https://nku.instructure.com/api/v1/files/14090560" data-api-returntype="File">https://nku.instructure.com/files/14090560/download?download_frd=1</a>&nbsp;</li>
+        </ul>
+    </li>
+    <li data-start="406" data-end="454">Demo Video: <a href="https://mymailnku-my.sharepoint.com/:f:/g/personal/molloyb1_mymail_nku_edu/IgDaNrJqsdXdSqEx7wf9mTELAf4NspTE_f1cegSn-NSwaRY?e=v07Fcs">Demo Vid</a></li>
+    <li data-start="406" data-end="454">Demo Video With Voice Over: <a href="https://mymailnku-my.sharepoint.com/:v:/g/personal/molloyb1_mymail_nku_edu/IQBrIPVRk379Sba4KgaSDQrSAeksE1Murvgs02D6GQRWwOo?e=YGy6VR">NetTower_Walk_Through_Demo_VoiceOver.mov</a></li>
+    <li data-start="406" data-end="454">Final Presentation PDF: <a href="https://github.com/btmolloy/NetTower-Capstone-Project/blob/main/docs/presentations/Final%20Presentation/Final%20Capstone%20Presentation.pdf" target="_blank" rel="noopener">https://github.com/btmolloy/NetTower-Capstone-Project/blob/main/docs/presentations/Final%20Presentation/Final%20Capstone%20Presentation.pdf</a>&nbsp;</li>
+    <li data-start="406" data-end="454">Learning with AI Topic 1 PDF: <a href="https://github.com/btmolloy/Learning-With-AI/blob/main/Presentations/LWAI_Topic_1/Learning_With_AI_Topic_1_Net_Layers.pdf" target="_blank" rel="noopener">https://github.com/btmolloy/Learning-With-AI/blob/main/Presentations/LWAI_Topic_1/Learning_With_AI_Topic_1_Net_Layers.pdf</a>&nbsp;</li>
+    <li>Learning with AI Topic 2 PDF: <a href="https://github.com/btmolloy/Learning-With-AI/blob/main/Presentations/LWAI_Topic_2/Learning_With_AI_Topic_2_Packet_Meaning.pdf" target="_blank" rel="noopener">https://github.com/btmolloy/Learning-With-AI/blob/main/Presentations/LWAI_Topic_2/Learning_With_AI_Topic_2_Packet_Meaning.pdf</a>&nbsp;</li>
 </ul>
 <hr data-start="502" data-end="505" />
 <h1 data-start="507" data-end="529"><strong data-start="509" data-end="529">Project Overview</strong></h1>
@@ -118,17 +130,20 @@
     <li data-start="2754" data-end="2842">
         <p data-start="2756" data-end="2842">A <strong data-start="2758" data-end="2781">discovery component</strong> responsible for scanning and collecting network information.</p>
     </li>
+    <li data-start="2754" data-end="2842"><strong>Event driven processing pipeline&nbsp;</strong>for the processing of collected data.</li>
     <li data-start="2843" data-end="2919">
-        <p data-start="2845" data-end="2919">A <strong data-start="2847" data-end="2870">data modeling layer</strong> that stores device and connectivity information.</p>
+        <p data-start="2845" data-end="2919">A <strong data-start="2847" data-end="2870">data modeling layer</strong> that converts data into Host and Edge entities.</p>
     </li>
-    <li data-start="2920" data-end="2992">
-        <p data-start="2922" data-end="2992">A <strong data-start="2924" data-end="2957">web-based visualization layer</strong> that renders the network topology.</p>
+    <li data-start="2843" data-end="2919">
+        <p data-start="2845" data-end="2919"><strong>MongoDB component </strong>which centralizes the processed data for runtime storage.</p>
     </li>
-    <li data-start="2993" data-end="3067">
-        <p data-start="2995" data-end="3067">A <strong data-start="2997" data-end="3018">control interface</strong> that allows users to adjust scanning parameters.</p>
-    </li>
+    <li>A <strong data-start="2924" data-end="2957">web-based visualization layer</strong> that renders the network topology.</li>
 </ul>
-<p data-start="3069" data-end="3201">The system will operate locally or in a self-hosted environment and will not rely on external cloud services for core functionality.</p>
+<p data-start="3069" data-end="3201">The system will operate locally or in a self-hosted environment and will not rely on external cloud services for core functionality. This stack architecture was used, specifically python, because it is a language that can run on most devices and it allows others to develop the code easily since it is a high level programming language.&nbsp;</p>
+<p data-start="3069" data-end="3201">&nbsp;</p>
+<div>
+    <div><span>Python (event-driven backend and processing pipeline), tcpdump and Nmap (network discovery), MongoDB (runtime data storage), JavaScript/HTML/CSS with Electron (frontend visualization), JSON-based data exchange.</span></div>
+</div>
 <p data-start="3069" data-end="3201">&nbsp;</p>
 <h3 data-start="3069" data-end="3201">Project Architecture&nbsp;</h3>
 <p data-start="3069" data-end="3201">code/<br />├── backEnd/<br />│ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; ├── models/<br />│ &nbsp; │ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; │ &nbsp; ├── __init__.py<br />│ &nbsp; │ &nbsp; ├── entities.py<br />│ &nbsp; │ &nbsp; ├── events.py<br />│ &nbsp; │ &nbsp; └── types.py<br />│ &nbsp; ├── pipeline/<br />│ &nbsp; │ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; │ &nbsp; └── event_bus.py<br />│ &nbsp; ├── processors/<br />│ &nbsp; │ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; │ &nbsp; ├── correlation.py<br />│ &nbsp; │ &nbsp; ├── enrichment.py<br />│ &nbsp; │ &nbsp; └── extractors.py<br />│ &nbsp; ├── resources/<br />│ &nbsp; │ &nbsp; ├── device_hints.json<br />│ &nbsp; │ &nbsp; └── oui_vendors.json<br />│ &nbsp; ├── runtime/<br />│ &nbsp; │ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; │ &nbsp; ├── __init__.py<br />│ &nbsp; │ &nbsp; ├── binary_resolver.py<br />│ &nbsp; │ &nbsp; ├── config.py<br />│ &nbsp; │ &nbsp; ├── mongo_runtime.py<br />│ &nbsp; │ &nbsp; ├── paths.py<br />│ &nbsp; │ &nbsp; ├── runtime_state.py<br />│ &nbsp; │ &nbsp; ├── session_config.py<br />│ &nbsp; │ &nbsp; ├── session_manager.py<br />│ &nbsp; │ &nbsp; ├── settings.py<br />│ &nbsp; │ &nbsp; ├── shutdown.py<br />│ &nbsp; │ &nbsp; └── supervisor.py<br />│ &nbsp; ├── sensors/<br />│ &nbsp; │ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; │ &nbsp; ├── active_discovery.py<br />│ &nbsp; │ &nbsp; └── passive_listener.py<br />│ &nbsp; ├── storage/<br />│ &nbsp; │ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; │ &nbsp; ├── librarian.py<br />│ &nbsp; │ &nbsp; └── mongo_client.py<br />│ &nbsp; ├── utils/<br />│ &nbsp; │ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; │ &nbsp; ├── logging.py<br />│ &nbsp; │ &nbsp; └── net.py<br />│ &nbsp; ├── __init__.py<br />│ &nbsp; └── main.py<br />├── frontEnd/<br />│ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; ├── css/<br />│ &nbsp; │ &nbsp; └── styles.css<br />│ &nbsp; ├── js/<br />│ &nbsp; │ &nbsp; ├── launch_controller.js<br />│ &nbsp; │ &nbsp; └── main_controller.js<br />│ &nbsp; ├── node_modules/<br />│ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; ├── windows/<br />│ &nbsp; │ &nbsp; ├── launch.html<br />│ &nbsp; │ &nbsp; └── main.html<br />│ &nbsp; ├── main.js<br />│ &nbsp; ├── NetTowerIcon-square.png<br />│ &nbsp; ├── NetTowerIcon.png<br />│ &nbsp; ├── package-lock.json<br />│ &nbsp; ├── package.json<br />│ &nbsp; ├── preload.js<br />│ &nbsp; └── supervisor_bridge.py<br />├── runtime/<br />│ &nbsp; ├── mongod.log<br />│ &nbsp; └── session_config.json<br />├── runtime_binaries/<br />│ &nbsp; ├── macos/<br />│ &nbsp; │ &nbsp; └── mongod<br />│ &nbsp; └── windows/<br />│ &nbsp; &nbsp; &nbsp; ├── mongod.exe<br />│ &nbsp; &nbsp; &nbsp; └── tshark.exe<br />├── tests/<br />│ &nbsp; ├── __pycache__/<br />│ &nbsp; │ &nbsp; └── ...<br />│ &nbsp; ├── helpers.py<br />│ &nbsp; ├── NetTower_Test_Plan_Outline.docx<br />│ &nbsp; ├── run_code_tests.py<br />│ &nbsp; ├── test_01_session_config.py<br />│ &nbsp; ├── test_02_enrichment.py<br />│ &nbsp; ├── test_03_correlation_inference.py<br />│ &nbsp; ├── test_04_extractor_pipeline_snapshot.py<br />│ &nbsp; └── test_05_runtime_and_additional_integration.py<br />├── venv/<br />│ &nbsp; └── ...<br />└──.gitignore<br /><br />&nbsp;&nbsp;</p>
@@ -240,7 +255,41 @@
 <p>&nbsp;</p>
 <p>There will be 6 Manual tests and 28 automatic code tests. There will be 34 tests in total.</p>
 <p data-start="4288" data-end="4390">&nbsp;</p>
-
+<hr data-start="4392" data-end="4395" />
+<h1 data-start="4397" data-end="4419"><strong data-start="4399" data-end="4419">Learning with AI</strong></h1>
+<h3 data-start="4421" data-end="4440">Topics to Learn</h3>
+<ul data-start="4441" data-end="4586">
+    <li data-start="4441" data-end="4521">
+        <p data-start="4443" data-end="4521">Layer 2, Layer 3, and Layer 4 protocol behavior, limitations, and capabilities</p>
+    </li>
+    <li data-start="4522" data-end="4586">
+        <p data-start="4524" data-end="4586">Traffic packet structure and protocol breakdown at a low level</p>
+    </li>
+</ul>
+<h3 data-start="4588" data-end="4606">How AI Is Used</h3>
+<ul data-start="4607" data-end="4822">
+    <li data-start="4607" data-end="4654">
+        <p data-start="4609" data-end="4654">Breaking down protocol mechanics step-by-step</p>
+    </li>
+    <li data-start="4655" data-end="4698">
+        <p data-start="4657" data-end="4698">Exploring inference limits and edge cases</p>
+    </li>
+    <li data-start="4699" data-end="4760">
+        <p data-start="4701" data-end="4760">Supporting design decisions for discovery and visualization</p>
+    </li>
+    <li data-start="4761" data-end="4822">
+        <p data-start="4763" data-end="4822">Validating reasoning about constrained network environments</p>
+    </li>
+</ul>
+<p data-start="4824" data-end="4914">The AI component supports technical learning rather than adding AI-based product features.<br /><br /><span style="text-decoration: underline;"><strong>How AI is Used in the Implementation Process:</strong></span></p>
+<p data-start="4824" data-end="4914">AI was used in some instances to write more efficient code, test cases that I am unable to replicate on my network and research tool and knowledge that I can use to improve my project.</p>
+<p data-start="4824" data-end="4914">&nbsp;</p>
+<p data-start="4824" data-end="4914"><span style="text-decoration: underline;"><strong>AI Tools Used and How:</strong></span></p>
+<div>
+    <div><span>I used ChatGPT, Claude, and Gemini to break down networking concepts, validate assumptions about protocol behavior, and explore limitations in Layer 2&ndash;4 communication. AI assisted in designing the discovery and inference approach, particularly in understanding what conclusions could and could not be made from observed network data. It was also used to refine architectural decisions and troubleshoot implementation challenges. The focus was on using AI as a learning and reasoning assistant rather than explicitly for direct code generation. </span></div>
+    <div><span>With that, AI was used in some instances to write more efficient code, test cases that I am unable to replicate on my network and research tool and knowledge that I can use to improve my project.</span></div>
+</div>
+<p data-start="4824" data-end="4914">&nbsp;</p>
 <hr data-start="4916" data-end="4919" />
 <h1 data-start="4921" data-end="4945"><strong data-start="4923" data-end="4945">Challenges / Risks</strong></h1>
 <ul data-start="4947" data-end="5226">
